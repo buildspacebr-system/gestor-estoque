@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gestor de Estoque</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+:root {
+  --bg:#0f1117; --surface:#181c27; --surface2:#1e2333; --border:#2a3044;
+  --accent:#4f8ef7; --accent2:#38d9a9; --warn:#f4a840; --danger:#f06565;
+  --text:#e8ecf4; --muted:#7a849e; --sidebar-w:220px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh;font-size:14px;}
+
+/* LOGIN */
+#loginScreen{display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:var(--bg);z-index:999;}
+#loginScreen.hidden{display:none;}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:40px 36px;width:380px;max-width:95vw;}
+.login-logo{font-size:22px;font-weight:700;color:var(--accent);margin-bottom:6px;}
+.login-sub{color:var(--muted);font-size:13px;margin-bottom:28px;}
+.login-box .fg{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;}
+.login-box label{font-size:12px;color:var(--muted);font-weight:500;}
+.login-box input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--text);font-size:14px;outline:none;}
+.login-box input:focus{border-color:var(--accent);}
+.btn-login{width:100%;padding:11px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-top:8px;transition:background 0.15s;}
+.btn-login:hover{background:#3a7de8;}
+.btn-login:disabled{opacity:0.6;cursor:not-allowed;}
+#loginError{color:var(--danger);font-size:12px;margin-top:10px;min-height:16px;text-align:center;}
+
+/* LOADING */
+#loadingOverlay{display:flex;position:fixed;inset:0;background:rgba(15,17,23,0.9);z-index:998;align-items:center;justify-content:center;flex-direction:column;gap:12px;}
+#loadingOverlay.hidden{display:none;}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* SIDEBAR */
+#sidebar{width:var(--sidebar-w);background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;position:fixed;top:0;left:0;bottom:0;z-index:100;}
+.logo{padding:20px 20px 16px;border-bottom:1px solid var(--border);}
+.logo span{font-size:17px;font-weight:700;color:var(--accent);}
+.logo small{display:block;color:var(--muted);font-size:11px;margin-top:2px;}
+nav{flex:1;padding:12px 10px;display:flex;flex-direction:column;gap:2px;}
+nav a{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;color:var(--muted);text-decoration:none;font-size:13px;font-weight:500;cursor:pointer;transition:all 0.15s;}
+nav a:hover{background:var(--surface2);color:var(--text);}
+nav a.active{background:rgba(79,142,247,0.15);color:var(--accent);}
+nav a .icon{font-size:16px;width:20px;text-align:center;}
+.sidebar-footer{padding:12px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px;}
+#userInfo{font-size:11px;color:var(--muted);text-align:center;}
+#userEmail{font-size:11px;color:var(--muted);text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+#saveStatus{font-size:11px;color:var(--muted);text-align:center;}
+.btn-logout{width:100%;padding:7px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;background:rgba(240,101,101,0.15);color:var(--danger);border:1px solid rgba(240,101,101,0.3);}
+.btn-logout:hover{background:rgba(240,101,101,0.3);}
+
+/* MAIN */
+#main{margin-left:var(--sidebar-w);flex:1;display:flex;flex-direction:column;}
+header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 28px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;}
+.page-title{font-size:16px;font-weight:600;}
+.content{padding:24px;flex:1;}
+
+/* BTNS */
+.btn{padding:8px 14px;border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;transition:all 0.15s;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{background:#3a7de8;}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border);}
+.btn-secondary:hover{background:var(--border);}
+.btn-danger{background:rgba(240,101,101,0.15);color:var(--danger);border:1px solid rgba(240,101,101,0.3);}
+.btn-danger:hover{background:rgba(240,101,101,0.25);}
+.btn-warn{background:rgba(244,168,64,0.15);color:var(--warn);border:1px solid rgba(244,168,64,0.3);}
+.btn-warn:hover{background:rgba(244,168,64,0.25);}
+.btn-green{background:rgba(56,217,169,0.15);color:var(--accent2);border:1px solid rgba(56,217,169,0.3);}
+.btn-green:hover{background:rgba(56,217,169,0.25);}
+.btn-sm{padding:5px 10px;font-size:12px;}
+.btn-xs{padding:3px 8px;font-size:11px;}
+
+/* CARDS */
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:14px;margin-bottom:24px;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:18px;}
+.card-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:8px;}
+.card-value{font-size:24px;font-weight:700;font-family:'JetBrains Mono',monospace;}
+.card-sub{font-size:12px;color:var(--muted);margin-top:4px;}
+.c-blue .card-value{color:var(--accent);}
+.c-green .card-value{color:var(--accent2);}
+.c-warn .card-value{color:var(--warn);}
+.c-red .card-value{color:var(--danger);}
+
+/* TABLE */
+.table-wrap{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:20px;}
+.table-header{padding:14px 18px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border);flex-wrap:wrap;gap:10px;}
+.table-title{font-weight:600;font-size:14px;}
+table{width:100%;border-collapse:collapse;}
+th{text-align:left;padding:10px 16px;font-size:11px;text-transform:uppercase;letter-spacing:0.8px;color:var(--muted);border-bottom:1px solid var(--border);}
+td{padding:11px 16px;border-bottom:1px solid var(--border);font-size:13px;vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tr:hover td{background:var(--surface2);}
+
+/* SEARCH */
+.search-input{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 12px;color:var(--text);font-size:13px;outline:none;}
+.search-input::placeholder{color:var(--muted);}
+.search-input:focus{border-color:var(--accent);}
+
+/* BADGE */
+.badge{display:inline-block;padding:3px 8px;border-radius:20px;font-size:11px;font-weight:600;}
+.badge-green{background:rgba(56,217,169,0.15);color:var(--accent2);}
+.badge-warn{background:rgba(244,168,64,0.15);color:var(--warn);}
+.badge-red{background:rgba(240,101,101,0.15);color:var(--danger);}
+.badge-blue{background:rgba(79,142,247,0.15);color:var(--accent);}
+.badge-gray{background:rgba(122,132,158,0.15);color:var(--muted);}
+.badge-purple{background:rgba(160,100,240,0.15);color:#a064f0;}
+
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.65);z-index:300;align-items:center;justify-content:center;padding:16px;}
+.modal-bg.open{display:flex;}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:26px;width:520px;max-width:100%;max-height:90vh;overflow-y:auto;}
+.modal-lg{width:700px;}
+.modal h3{font-size:16px;font-weight:600;margin-bottom:18px;}
+.modal-footer{display:flex;justify-content:flex-end;gap:10px;margin-top:18px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-row-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.fg{display:flex;flex-direction:column;gap:5px;margin-bottom:12px;}
+.fg label{font-size:12px;color:var(--muted);font-weight:500;}
+.fg input,.fg select,.fg textarea{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;color:var(--text);font-size:13px;outline:none;font-family:inherit;}
+.fg input:focus,.fg select:focus,.fg textarea:focus{border-color:var(--accent);}
+select option{background:var(--surface2);}
+
+/* PAGES */
+.page{display:none;}
+.page.active{display:block;}
+.section-title{font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:0.8px;margin-bottom:12px;margin-top:20px;}
+
+/* SOLICITACOES LAYOUT */
+.sol-layout{display:grid;grid-template-columns:340px 1fr;gap:20px;align-items:start;}
+.sol-panel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:20px;}
+.sol-panel h4{font-size:14px;font-weight:600;margin-bottom:16px;color:var(--text);}
+.divider{border:none;border-top:1px solid var(--border);margin:14px 0;}
+.collapse-btn{background:none;border:none;color:var(--accent);font-size:12px;cursor:pointer;padding:4px 0;font-weight:500;}
+.collapse-section{display:none;}
+.collapse-section.open{display:block;}
+
+/* DROPDOWN SEARCH */
+.dropdown-wrap{position:relative;}
+.dropdown-list{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--surface);border:1px solid var(--border);border-radius:8px;z-index:200;max-height:200px;overflow-y:auto;display:none;}
+.dropdown-list.open{display:block;}
+.dropdown-item{padding:9px 12px;font-size:13px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;}
+.dropdown-item:hover{background:var(--surface2);}
+.dropdown-item .di-code{font-size:11px;color:var(--muted);font-family:monospace;}
+.dropdown-add{padding:9px 12px;font-size:12px;color:var(--accent);cursor:pointer;border-top:1px solid var(--border);}
+.dropdown-add:hover{background:var(--surface2);}
+
+/* ACTIONS */
+.actions{display:flex;gap:5px;flex-wrap:wrap;}
+
+/* TOAST */
+#toast{position:fixed;bottom:24px;right:24px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 18px;font-size:13px;z-index:9999;transform:translateY(100px);opacity:0;transition:all 0.3s;pointer-events:none;}
+#toast.show{transform:translateY(0);opacity:1;}
+#toast.success{border-color:var(--accent2);color:var(--accent2);}
+#toast.error{border-color:var(--danger);color:var(--danger);}
+#toast.warn{border-color:var(--warn);color:var(--warn);}
+
+/* PROGRESS */
+.progress-bar{background:var(--border);border-radius:4px;height:6px;overflow:hidden;margin-top:4px;}
+.progress-fill{height:100%;border-radius:4px;background:var(--accent);}
+.progress-fill.warn{background:var(--warn);}
+.progress-fill.low{background:var(--danger);}
+
+/* ROLE BADGE */
+.role-tag{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;}
+.role-admin{background:rgba(79,142,247,0.2);color:var(--accent);}
+.role-comprador{background:rgba(56,217,169,0.2);color:var(--accent2);}
+.role-consultor{background:rgba(160,100,240,0.2);color:#a064f0;}
+
+/* INFO BOX */
+.info-box{background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--muted);margin-bottom:14px;}
+
+@media(max-width:900px){
+  .sol-layout{grid-template-columns:1fr;}
+  .form-row,.form-row-3{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">📦 Gestor de Estoque</div>
+    <div class="login-sub">Entre com sua conta para continuar</div>
+    <div class="fg"><label>E-mail</label><input type="email" id="loginEmail" placeholder="seu@email.com" autocomplete="username"></div>
+    <div class="fg"><label>Senha</label><input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="btn-login" id="btnLogin" onclick="doLogin()">Entrar</button>
+    <div id="loginError"></div>
+  </div>
+</div>
+
+<!-- LOADING -->
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <span style="color:var(--muted);font-size:13px">Carregando...</span>
+</div>
+
+<!-- SIDEBAR -->
+<aside id="sidebar">
+  <div class="logo">
+    <span>📦 Gestor de Estoque</span>
+    <small id="empresaLabel">Carregando...</small>
+  </div>
+  <nav id="sideNav"></nav>
+  <div class="sidebar-footer">
+    <div id="userInfo"></div>
+    <div id="userEmail"></div>
+    <div id="saveStatus"></div>
+    <button class="btn-logout" onclick="doLogout()">🚪 Sair</button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div id="main">
+  <header>
+    <div class="page-title" id="pageTitle">Carregando...</div>
+    <div id="headerActions"></div>
+  </header>
+  <div class="content">
+
+    <!-- SOLICITAÇÕES (comprador + consultor + admin) -->
+    <div id="page-solicitacoes" class="page">
+      <div class="sol-layout">
+
+        <!-- PAINEL ESQUERDO: FORMULÁRIO -->
+        <div id="solFormPanel" class="sol-panel">
+          <h4>➕ Nova Solicitação</h4>
+
+          <!-- PRODUTO -->
+          <div class="fg">
+            <label>Produto *</label>
+            <div class="dropdown-wrap">
+              <input class="search-input" id="solProdSearch" placeholder="Buscar por nome ou código..." autocomplete="off" oninput="filterProdDrop()" onfocus="openProdDrop()">
+              <div class="dropdown-list" id="prodDropList"></div>
+            </div>
+            <input type="hidden" id="solProdId">
+          </div>
+          <div id="prodSelectedInfo" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:10px;color:var(--muted)"></div>
+
+          <!-- NOVO PRODUTO (colapsável) -->
+          <button class="collapse-btn" onclick="toggleCollapse('addProdSection', this)">+ Cadastrar novo produto</button>
+          <div class="collapse-section" id="addProdSection">
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin:10px 0;">
+              <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:12px;">📦 Novo Produto</div>
+              <div class="form-row">
+                <div class="fg"><label>Código</label><input id="npCodigo" placeholder="SKU-001"></div>
+                <div class="fg"><label>Categoria</label><select id="npCategoria"></select></div>
+              </div>
+              <div class="fg"><label>Nome *</label><input id="npNome" placeholder="Nome do produto"></div>
+              <div class="form-row">
+                <div class="fg"><label>Estoque Atual</label><input id="npEstoque" type="number" value="0" min="0"></div>
+                <div class="fg"><label>Estoque Mínimo</label><input id="npMinimo" type="number" value="10" min="0"></div>
+              </div>
+              <div class="form-row">
+                <div class="fg"><label>Custo Unit. (R$)</label><input id="npCusto" type="number" value="0" step="0.01" min="0"></div>
+                <div class="fg"><label>Localização</label><input id="npLocal" placeholder="Prateleira A1"></div>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="saveNovoProduto()" style="width:100%">✓ Salvar Produto e Selecionar</button>
+            </div>
+          </div>
+
+          <hr class="divider">
+
+          <!-- FORNECEDOR -->
+          <div class="fg">
+            <label>Fornecedor (opcional)</label>
+            <div class="dropdown-wrap">
+              <input class="search-input" id="solFornSearch" placeholder="Buscar fornecedor..." autocomplete="off" oninput="filterFornDrop()" onfocus="openFornDrop()">
+              <div class="dropdown-list" id="fornDropList"></div>
+            </div>
+            <input type="hidden" id="solFornId">
+          </div>
+          <div id="fornSelectedInfo" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:10px;color:var(--muted)"></div>
+
+          <!-- NOVO FORNECEDOR (colapsável) -->
+          <button class="collapse-btn" onclick="toggleCollapse('addFornSection', this)">+ Cadastrar novo fornecedor</button>
+          <div class="collapse-section" id="addFornSection">
+            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin:10px 0;">
+              <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:12px;">🏭 Novo Fornecedor</div>
+              <div class="fg"><label>Nome *</label><input id="nfNome" placeholder="Razão Social"></div>
+              <div class="form-row">
+                <div class="fg"><label>CNPJ</label><input id="nfCnpj" placeholder="00.000.000/0001-00"></div>
+                <div class="fg"><label>Telefone</label><input id="nfTel" placeholder="(11) 99999-0000"></div>
+              </div>
+              <div class="form-row">
+                <div class="fg"><label>Email</label><input id="nfEmail" type="email" placeholder="contato@empresa.com"></div>
+                <div class="fg"><label>Contato</label><input id="nfContato" placeholder="Nome do contato"></div>
+              </div>
+              <button class="btn btn-primary btn-sm" onclick="saveNovoFornecedor()" style="width:100%">✓ Salvar Fornecedor e Selecionar</button>
+            </div>
+          </div>
+
+          <hr class="divider">
+
+          <!-- RESTANTE DA SOLICITAÇÃO -->
+          <div class="form-row">
+            <div class="fg"><label>Quantidade *</label><input id="solQtd" type="number" value="1" min="1"></div>
+            <div class="fg"><label>Prioridade</label>
+              <select id="solPrioridade">
+                <option value="Baixa">Baixa</option>
+                <option value="Normal" selected>Normal</option>
+                <option value="Alta">Alta</option>
+                <option value="Urgente">Urgente</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- SOLICITANTE -->
+          <div class="fg">
+            <label>Solicitante *</label>
+            <div class="dropdown-wrap">
+              <input class="search-input" id="solSolicitanteSearch" placeholder="Buscar solicitante..." autocomplete="off" oninput="filterSolicitanteDrop()" onfocus="openSolicitanteDrop()">
+              <div class="dropdown-list" id="solicitanteDropList"></div>
+            </div>
+            <input type="hidden" id="solSolicitanteId">
+          </div>
+
+          <div class="fg"><label>Justificativa</label><textarea id="solJustificativa" rows="2" style="resize:vertical"></textarea></div>
+
+          <button class="btn btn-primary" style="width:100%" onclick="saveSolicitacao()">✓ Registrar Solicitação</button>
+        </div>
+
+        <!-- PAINEL DIREITO: LISTA -->
+        <div>
+          <div class="table-wrap">
+            <div class="table-header">
+              <span class="table-title">Solicitações</span>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <input class="search-input" placeholder="🔍 Buscar..." oninput="filterTable('solTable',this.value)" style="width:180px">
+                <select class="search-input" id="filtroStatus" onchange="renderSolicitacoes()" style="width:140px">
+                  <option value="">Todos os status</option>
+                  <option value="Pendente">Pendente</option>
+                  <option value="Em Cotação">Em Cotação</option>
+                  <option value="Comprou">Comprou</option>
+                  <option value="Cancelado">Cancelado</option>
+                </select>
+              </div>
+            </div>
+            <table id="solTable">
+              <thead><tr>
+                <th>ID</th><th>Produto</th><th>Qtd</th><th>Solicitante</th>
+                <th>Prioridade</th><th>Fornecedor</th><th>Status</th><th>Ações</th>
+              </tr></thead>
+              <tbody id="solBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ESTOQUE (admin) -->
+    <div id="page-estoque" class="page">
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">Produtos em Estoque</span>
+          <div style="display:flex;gap:8px">
+            <input class="search-input" placeholder="🔍 Buscar produto..." oninput="filterTable('estoqueTable',this.value)" style="width:200px">
+            <button class="btn btn-primary" onclick="openModal('modalEstoque');document.getElementById('modalEstoqueTitle').textContent='Novo Produto';document.getElementById('eId').value='';">+ Produto</button>
+          </div>
+        </div>
+        <table id="estoqueTable">
+          <thead><tr><th>Código</th><th>Produto</th><th>Categoria</th><th>Estoque</th><th>Mínimo</th><th>Custo</th><th>Local</th><th>Status</th><th>Ações</th></tr></thead>
+          <tbody id="estoqueBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- FORNECEDORES (admin) -->
+    <div id="page-fornecedores" class="page">
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">Fornecedores</span>
+          <button class="btn btn-primary" onclick="openModal('modalFornecedor');document.getElementById('modalFornTitle').textContent='Novo Fornecedor';document.getElementById('fId').value='';">+ Fornecedor</button>
+        </div>
+        <table>
+          <thead><tr><th>Nome</th><th>CNPJ</th><th>Contato</th><th>Email</th><th>Telefone</th><th>Categoria</th><th>Avaliação</th><th>Ações</th></tr></thead>
+          <tbody id="fornecedoresBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- SOLICITANTES (admin) -->
+    <div id="page-solicitantes" class="page">
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">Solicitantes</span>
+          <button class="btn btn-primary" onclick="openModal('modalSolicitante')">+ Solicitante</button>
+        </div>
+        <table>
+          <thead><tr><th>Nome</th><th>Setor / Cargo</th><th>Email</th><th>Ações</th></tr></thead>
+          <tbody id="solicitantesBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- RELATÓRIOS (admin) -->
+    <div id="page-relatorios" class="page">
+      <div class="cards" id="relCards"></div>
+      <div class="section-title">Por Categoria</div>
+      <div class="table-wrap">
+        <table><thead><tr><th>Categoria</th><th>Itens</th><th>Valor Estoque</th><th>Críticos</th></tr></thead>
+        <tbody id="relCatBody"></tbody></table>
+      </div>
+      <div class="section-title" style="margin-top:20px">Exportar</div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-secondary" onclick="exportCSV('estoque')">⬇ Estoque CSV</button>
+        <button class="btn btn-secondary" onclick="exportCSV('solicitacoes')">⬇ Solicitações CSV</button>
+        <button class="btn btn-secondary" onclick="exportCSV('fornecedores')">⬇ Fornecedores CSV</button>
+      </div>
+    </div>
+
+    <!-- CONFIGURAÇÕES (admin) -->
+    <div id="page-configuracoes" class="page">
+      <div class="cards">
+        <div class="card">
+          <div class="card-label">Empresa</div>
+          <div style="margin-top:10px">
+            <div class="fg"><label>Nome da Empresa</label><input id="cfgEmpresa" placeholder="Minha Empresa"></div>
+            <div class="fg"><label>CNPJ</label><input id="cfgCnpj" placeholder="00.000.000/0001-00"></div>
+            <button class="btn btn-primary btn-sm" onclick="saveConfig()">Salvar</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-label">Categorias de Produto</div>
+          <div style="margin-top:10px">
+            <div id="catList" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px"></div>
+            <div style="display:flex;gap:8px">
+              <input id="newCat" class="search-input" style="width:140px" placeholder="Nova categoria">
+              <button class="btn btn-primary btn-sm" onclick="addCat()">+</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="info-box" style="margin-top:16px">
+        <b>Sobre os perfis de usuário:</b><br>
+        Os usuários são cadastrados no Firebase Authentication e o perfil (role) é definido no Firestore em <code>usuarios/{uid}</code> com o campo <code>role: "admin" | "comprador" | "consultor"</code>.
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- MODAL COMPRA/COTAÇÃO -->
+<div class="modal-bg" id="modalCompra">
+  <div class="modal">
+    <h3 id="modalCompraTitle">Registrar Ação</h3>
+    <input type="hidden" id="compraSOLID">
+    <div class="fg"><label>Tipo de Ação</label>
+      <select id="compraTipo" onchange="toggleCompraFields()">
+        <option value="Em Cotação">Em Cotação</option>
+        <option value="Comprou">Comprou</option>
+      </select>
+    </div>
+    <div class="fg"><label>Fornecedor</label>
+      <select id="compraForn"></select>
+    </div>
+    <div id="compraFields">
+      <div class="form-row">
+        <div class="fg"><label>Valor Unitário (R$)</label><input id="compraValor" type="number" step="0.01" min="0" value="0"></div>
+        <div class="fg"><label>Quantidade</label><input id="compraQtd" type="number" min="1" value="1"></div>
+      </div>
+      <div class="form-row">
+        <div class="fg"><label>Data da Compra</label><input id="compraData" type="date"></div>
+        <div class="fg"><label>Previsão de Entrega</label><input id="compraPrevisao" type="date"></div>
+      </div>
+    </div>
+    <div class="fg"><label>Observação</label><textarea id="compraObs" rows="2" style="resize:vertical"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalCompra')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveCompra()">✓ Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL ESTOQUE -->
+<div class="modal-bg" id="modalEstoque">
+  <div class="modal">
+    <h3 id="modalEstoqueTitle">Novo Produto</h3>
+    <div class="form-row">
+      <div class="fg"><label>Código</label><input id="eCodigo" placeholder="SKU-001"></div>
+      <div class="fg"><label>Categoria</label><select id="eCategoria"></select></div>
+    </div>
+    <div class="fg"><label>Nome do Produto *</label><input id="eNome" placeholder="Nome do produto"></div>
+    <div class="form-row">
+      <div class="fg"><label>Estoque Atual</label><input id="eEstoque" type="number" value="0" min="0"></div>
+      <div class="fg"><label>Estoque Mínimo</label><input id="eMinimo" type="number" value="10" min="0"></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Custo Unit. (R$)</label><input id="eCusto" type="number" value="0" step="0.01" min="0"></div>
+      <div class="fg"><label>Localização</label><input id="eLocal" placeholder="Prateleira A1"></div>
+    </div>
+    <div class="fg"><label>Observações</label><textarea id="eObs" rows="2" style="resize:vertical"></textarea></div>
+    <input type="hidden" id="eId">
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalEstoque')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveEstoque()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL FORNECEDOR -->
+<div class="modal-bg" id="modalFornecedor">
+  <div class="modal">
+    <h3 id="modalFornTitle">Novo Fornecedor</h3>
+    <div class="fg"><label>Nome / Razão Social *</label><input id="fNome" placeholder="Distribuidora XYZ Ltda"></div>
+    <div class="form-row">
+      <div class="fg"><label>CNPJ</label><input id="fCnpj" placeholder="00.000.000/0001-00"></div>
+      <div class="fg"><label>Telefone</label><input id="fTel" placeholder="(11) 99999-0000"></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Email</label><input id="fEmail" type="email" placeholder="contato@empresa.com"></div>
+      <div class="fg"><label>Contato</label><input id="fContato" placeholder="Nome do contato"></div>
+    </div>
+    <div class="form-row">
+      <div class="fg"><label>Categoria</label><select id="fCategoria"></select></div>
+      <div class="fg"><label>Avaliação</label>
+        <select id="fAvaliacao">
+          <option value="5">⭐⭐⭐⭐⭐ Excelente</option>
+          <option value="4">⭐⭐⭐⭐ Bom</option>
+          <option value="3" selected>⭐⭐⭐ Regular</option>
+          <option value="2">⭐⭐ Ruim</option>
+          <option value="1">⭐ Péssimo</option>
+        </select>
+      </div>
+    </div>
+    <input type="hidden" id="fId">
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalFornecedor')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveFornecedor()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL SOLICITANTE -->
+<div class="modal-bg" id="modalSolicitante">
+  <div class="modal">
+    <h3 id="modalSolTitle">Novo Solicitante</h3>
+    <div class="fg"><label>Nome *</label><input id="slNome" placeholder="Nome completo"></div>
+    <div class="form-row">
+      <div class="fg"><label>Setor / Cargo</label><input id="slSetor" placeholder="Ex: Financeiro"></div>
+      <div class="fg"><label>Email</label><input id="slEmail" type="email" placeholder="email@empresa.com"></div>
+    </div>
+    <input type="hidden" id="slId">
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalSolicitante')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveSolicitante()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- FIREBASE -->
+<script type="module">
+<!-- FIREBASE -->
+<script type="module">
+import { initializeApp }   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+import {
+  getFirestore,
+  doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc,
+  collection, getDocs, query, orderBy, writeBatch
+} from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+// ══════════════════════════════════════════
+//  ⚙️  SUBSTITUA PELOS SEUS DADOS DO FIREBASE
+// ══════════════════════════════════════════
+const firebaseConfig = {
+  apiKey:            "AIzaSyBXb3gubKXw2SYVgL28CTw-w7_NOoO3M9o",
+  authDomain:        "gestor-estoque-907d3.firebaseapp.com",
+  projectId:         "gestor-estoque-907d3",
+  storageBucket:     "gestor-estoque-907d3.firebasestorage.app",
+  messagingSenderId: "188687486392",
+  appId:             "1:188687486392:web:e59a868a0772d36c47534d"
+};
+// ══════════════════════════════════════════
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+// ─── STATE (em memória, carregado do Firestore) ───────────────────
+let state = {
+  estoque:[], solicitacoes:[], fornecedores:[], solicitantes:[],
+  categorias:['Escritório','Limpeza','TI','Manutenção','Copa','Segurança','Outros'],
+  config:{ empresa:'Minha Empresa', cnpj:'' }
+};
+let currentUser = null;
+let userRole    = null;
+
+// ─── MENUS POR ROLE ──────────────────────────────────────────────
+const MENUS = {
+  admin: [
+    {id:'solicitacoes', icon:'📋', label:'Solicitações'},
+    {id:'estoque',      icon:'📦', label:'Estoque'},
+    {id:'fornecedores', icon:'🏭', label:'Fornecedores'},
+    {id:'solicitantes', icon:'👥', label:'Solicitantes'},
+    {id:'relatorios',   icon:'📊', label:'Relatórios'},
+    {id:'configuracoes',icon:'⚙️', label:'Configurações'},
+  ],
+  comprador: [{id:'solicitacoes', icon:'📋', label:'Solicitações'}],
+  consultor: [{id:'solicitacoes', icon:'📋', label:'Solicitações'}],
+};
+
+// ─── FIRESTORE: ESTRUTURA DE COLEÇÕES ────────────────────────────
+// /estoque/{id}         → produtos
+// /fornecedores/{id}    → fornecedores
+// /solicitacoes/{id}    → solicitações
+// /solicitantes/{id}    → solicitantes
+// /config/dados         → configurações e categorias
+// /usuarios/{uid}       → role do usuário (gerenciado manualmente)
+
+async function loadFromFirestore() {
+  setStatus('⏳ Carregando...');
+  try {
+    const [estoqueSnap, fornSnap, solSnap, solicitantesSnap, configSnap] = await Promise.all([
+      getDocs(query(collection(db,'estoque'))),
+      getDocs(query(collection(db,'fornecedores'))),
+      getDocs(query(collection(db,'solicitacoes'), orderBy('data','desc'))),
+      getDocs(query(collection(db,'solicitantes'))),
+      getDoc(doc(db,'config','dados'))
+    ]);
+    state.estoque        = estoqueSnap.docs.map(d=>({...d.data(), _docId:d.id}));
+    state.fornecedores   = fornSnap.docs.map(d=>({...d.data(), _docId:d.id}));
+    state.solicitacoes   = solSnap.docs.map(d=>({...d.data(), _docId:d.id}));
+    state.solicitantes   = solicitantesSnap.docs.map(d=>({...d.data(), _docId:d.id}));
+    if (configSnap.exists()) {
+      const cfg = configSnap.data();
+      state.config     = cfg.config     || state.config;
+      state.categorias = cfg.categorias || state.categorias;
+    }
+    setStatus('✔ Sincronizado');
+  } catch(e) {
+    setStatus('⚠ Erro ao carregar');
+    console.error(e);
+  }
+}
+
+// Helpers de persistência por coleção
+async function upsertDoc(colName, item) {
+  // usa item.id como ID do documento
+  const ref = doc(db, colName, item.id);
+  const data = { ...item };
+  delete data._docId;
+  await setDoc(ref, data, { merge: true });
+  setStatus('✔ Salvo');
+}
+
+async function deleteDocument(colName, id) {
+  await deleteDoc(doc(db, colName, id));
+  setStatus('✔ Salvo');
+}
+
+async function saveConfig() {
+  await setDoc(doc(db,'config','dados'), {
+    config: state.config,
+    categorias: state.categorias
+  });
+  setStatus('✔ Salvo');
+}
+
+function setStatus(m){ const el=document.getElementById('saveStatus'); if(el) el.textContent=m; }
+
+// ─── AUTH ─────────────────────────────────────────────────────────
+window.doLogin = async function(){
+  const email=document.getElementById('loginEmail').value.trim();
+  const pass=document.getElementById('loginPassword').value;
+  const btn=document.getElementById('btnLogin');
+  const err=document.getElementById('loginError');
+  err.textContent=''; btn.disabled=true; btn.textContent='Entrando...';
+  try{ await signInWithEmailAndPassword(auth,email,pass); }
+  catch(e){
+    const msgs={
+      'auth/invalid-credential':'E-mail ou senha incorretos.',
+      'auth/user-not-found':'Usuário não encontrado.',
+      'auth/wrong-password':'Senha incorreta.',
+      'auth/invalid-email':'E-mail inválido.',
+      'auth/too-many-requests':'Muitas tentativas. Aguarde.'
+    };
+    err.textContent=msgs[e.code]||'Erro ao entrar.';
+    btn.disabled=false; btn.textContent='Entrar';
+  }
+};
+
+window.doLogout=async function(){
+  if(confirm('Deseja sair?')) await signOut(auth);
+};
+
+document.getElementById('loginPassword').addEventListener('keydown',e=>{
+  if(e.key==='Enter') window.doLogin();
+});
+
+onAuthStateChanged(auth, async(user)=>{
+  if(user){
+    currentUser=user;
+    document.getElementById('loginScreen').classList.add('hidden');
+    document.getElementById('loadingOverlay').classList.remove('hidden');
+    try{
+      const uSnap=await getDoc(doc(db,'usuarios',user.uid));
+      userRole=uSnap.exists()? uSnap.data().role : 'consultor';
+    }catch{ userRole='consultor'; }
+    await loadFromFirestore();
+    buildNav();
+    document.getElementById('userEmail').textContent=user.email;
+    const roleLabels={admin:'Administrador',comprador:'Comprador',consultor:'Consultor'};
+    document.getElementById('userInfo').innerHTML=`<span class="role-tag role-${userRole}">${roleLabels[userRole]||userRole}</span>`;
+    document.getElementById('empresaLabel').textContent=state.config?.empresa||'Gestor de Estoque';
+    document.getElementById('loadingOverlay').classList.add('hidden');
+    goTo(MENUS[userRole]?.[0]?.id||'solicitacoes');
+  } else {
+    currentUser=null; userRole=null;
+    document.getElementById('loginScreen').classList.remove('hidden');
+    document.getElementById('loadingOverlay').classList.add('hidden');
+    document.getElementById('btnLogin').disabled=false;
+    document.getElementById('btnLogin').textContent='Entrar';
+  }
+});
+
+// ─── NAV ─────────────────────────────────────────────────────────
+function buildNav(){
+  const nav=document.getElementById('sideNav');
+  const menus=MENUS[userRole]||MENUS.consultor;
+  nav.innerHTML=menus.map(m=>`<a onclick="goTo('${m.id}')"><span class="icon">${m.icon}</span>${m.label}</a>`).join('');
+}
+
+const pageTitles={
+  solicitacoes:'Solicitações', estoque:'Estoque', fornecedores:'Fornecedores',
+  solicitantes:'Solicitantes', relatorios:'Relatórios', configuracoes:'Configurações'
+};
+
+window.goTo=function(page){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('nav a').forEach(a=>a.classList.remove('active'));
+  const el=document.getElementById('page-'+page);
+  if(!el)return;
+  el.classList.add('active');
+  document.querySelectorAll('nav a').forEach(a=>{
+    if(a.getAttribute('onclick')?.includes("'"+page+"'")) a.classList.add('active');
+  });
+  document.getElementById('pageTitle').textContent=pageTitles[page]||page;
+  document.getElementById('headerActions').innerHTML='';
+  if(page==='solicitacoes') renderSolicitacoes();
+  if(page==='estoque') renderEstoque();
+  if(page==='fornecedores') renderFornecedores();
+  if(page==='solicitantes') renderSolicitantes();
+  if(page==='relatorios') renderRelatorios();
+  if(page==='configuracoes') renderConfiguracoes();
+  const panel=document.getElementById('solFormPanel');
+  if(panel) panel.style.display=(userRole==='consultor')?'none':'';
+};
+
+// ─── HELPERS ─────────────────────────────────────────────────────
+const uid=()=>Math.random().toString(36).slice(2,9);
+const fmt=v=>'R$ '+Number(v).toFixed(2).replace('.',',');
+const fmtDate=d=>d?new Date(d+'T00:00:00').toLocaleDateString('pt-BR'):'—';
+const stars=n=>'⭐'.repeat(Number(n));
+function getProduto(id){ return state.estoque.find(e=>e.id===id)||{nome:'—',codigo:''}; }
+function getFornecedor(id){ return state.fornecedores.find(f=>f.id===id)||{nome:'—'}; }
+function getSolicitante(id){ return state.solicitantes?.find(s=>s.id===id)||{nome:'—'}; }
+
+function toast(msg,type='success'){
+  const t=document.getElementById('toast');
+  t.textContent=msg; t.className='show '+type;
+  setTimeout(()=>t.className='',2800);
+}
+
+window.filterTable=function(tableId,query){
+  const q=query.toLowerCase();
+  document.querySelectorAll(`#${tableId} tbody tr`).forEach(tr=>{
+    tr.style.display=tr.textContent.toLowerCase().includes(q)?'':'none';
+  });
+};
+
+window.openModal=function(id){ document.getElementById(id).classList.add('open'); populateSelects(); };
+window.closeModal=function(id){ document.getElementById(id).classList.remove('open'); };
+document.querySelectorAll('.modal-bg').forEach(m=>m.addEventListener('click',e=>{ if(e.target===m) m.classList.remove('open'); }));
+
+function populateSelects(){
+  const catOpts=state.categorias.map(c=>`<option value="${c}">${c}</option>`).join('');
+  ['eCategoria','fCategoria','npCategoria'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=catOpts;});
+  const fornOpts=state.fornecedores.map(f=>`<option value="${f.id}">${f.nome}</option>`).join('');
+  const compraForn=document.getElementById('compraForn');
+  if(compraForn) compraForn.innerHTML='<option value="">— Selecione —</option>'+fornOpts;
+}
+
+function statusBadge(s){
+  const map={'Pendente':'badge-warn','Em Cotação':'badge-blue','Comprou':'badge-green','Cancelado':'badge-red'};
+  return `<span class="badge ${map[s]||'badge-gray'}">${s}</span>`;
+}
+function prioColor(p){ return p==='Urgente'?'badge-red':p==='Alta'?'badge-warn':p==='Normal'?'badge-blue':'badge-gray'; }
+
+window.toggleCollapse=function(id,btn){
+  const sec=document.getElementById(id);
+  const open=sec.classList.toggle('open');
+  btn.textContent=open?btn.textContent.replace('+','−'):btn.textContent.replace('−','+');
+};
+
+// ─── DROPDOWN PRODUTO ─────────────────────────────────────────────
+window.openProdDrop=function(){ renderProdDrop(); document.getElementById('prodDropList').classList.add('open'); };
+window.filterProdDrop=function(){ renderProdDrop(); document.getElementById('prodDropList').classList.add('open'); };
+function renderProdDrop(){
+  const q=document.getElementById('solProdSearch').value.toLowerCase();
+  const list=document.getElementById('prodDropList');
+  const filtered=state.estoque.filter(e=>e.nome.toLowerCase().includes(q)||e.codigo.toLowerCase().includes(q));
+  if(!filtered.length){
+    list.innerHTML=`<div style="padding:10px 12px;font-size:12px;color:var(--muted)">${q?`Nenhum resultado para "${q}".`:'Nenhum produto cadastrado.'}</div><div class="dropdown-add">Use "+ Cadastrar novo produto" abaixo ↓</div>`;
+    return;
+  }
+  list.innerHTML=filtered.map(e=>`<div class="dropdown-item" onclick="selectProd('${e.id}')"><span>${e.nome}</span><span class="di-code">${e.codigo}</span></div>`).join('');
+}
+window.selectProd=function(id){
+  const p=state.estoque.find(e=>e.id===id);
+  document.getElementById('solProdId').value=id;
+  document.getElementById('solProdSearch').value=p.nome;
+  document.getElementById('prodDropList').classList.remove('open');
+  const info=document.getElementById('prodSelectedInfo');
+  info.style.display='block';
+  info.innerHTML=`📦 <b>${p.nome}</b> &nbsp;|&nbsp; Código: <code>${p.codigo}</code> &nbsp;|&nbsp; Estoque: <b>${p.estoque}</b> &nbsp;|&nbsp; Mín: ${p.minimo} &nbsp;|&nbsp; Custo: ${fmt(p.custo)}`;
+};
+
+// ─── DROPDOWN FORNECEDOR ──────────────────────────────────────────
+window.openFornDrop=function(){ renderFornDrop(); document.getElementById('fornDropList').classList.add('open'); };
+window.filterFornDrop=function(){ renderFornDrop(); document.getElementById('fornDropList').classList.add('open'); };
+function renderFornDrop(){
+  const q=document.getElementById('solFornSearch').value.toLowerCase();
+  const list=document.getElementById('fornDropList');
+  const filtered=state.fornecedores.filter(f=>f.nome.toLowerCase().includes(q));
+  list.innerHTML=filtered.length
+    ? filtered.map(f=>`<div class="dropdown-item" onclick="selectForn('${f.id}')"><span>${f.nome}</span></div>`).join('')
+    : `<div style="padding:10px 12px;font-size:12px;color:var(--muted)">Nenhum resultado. Use "+ Cadastrar novo fornecedor" ↓</div>`;
+}
+window.selectForn=function(id){
+  const f=state.fornecedores.find(x=>x.id===id);
+  document.getElementById('solFornId').value=id;
+  document.getElementById('solFornSearch').value=f.nome;
+  document.getElementById('fornDropList').classList.remove('open');
+  const info=document.getElementById('fornSelectedInfo');
+  info.style.display='block';
+  info.innerHTML=`🏭 <b>${f.nome}</b> &nbsp;|&nbsp; ${f.telefone||''} &nbsp;|&nbsp; ${f.email||''}`;
+};
+
+// ─── DROPDOWN SOLICITANTE ─────────────────────────────────────────
+window.openSolicitanteDrop=function(){ renderSolDrop(); document.getElementById('solicitanteDropList').classList.add('open'); };
+window.filterSolicitanteDrop=function(){ renderSolDrop(); document.getElementById('solicitanteDropList').classList.add('open'); };
+function renderSolDrop(){
+  const q=document.getElementById('solSolicitanteSearch').value.toLowerCase();
+  const list=document.getElementById('solicitanteDropList');
+  const filtered=(state.solicitantes||[]).filter(s=>s.nome.toLowerCase().includes(q));
+  list.innerHTML=filtered.length
+    ? filtered.map(s=>`<div class="dropdown-item" onclick="selectSolicitante('${s.id}')"><span>${s.nome}</span><span class="di-code">${s.setor||''}</span></div>`).join('')
+    : `<div style="padding:10px 12px;font-size:12px;color:var(--muted)">Nenhum solicitante. Cadastre em Solicitantes.</div>`;
+}
+window.selectSolicitante=function(id){
+  const s=state.solicitantes.find(x=>x.id===id);
+  document.getElementById('solSolicitanteId').value=id;
+  document.getElementById('solSolicitanteSearch').value=s.nome;
+  document.getElementById('solicitanteDropList').classList.remove('open');
+};
+
+document.addEventListener('click',e=>{
+  if(!e.target.closest('.dropdown-wrap')){
+    document.querySelectorAll('.dropdown-list').forEach(d=>d.classList.remove('open'));
+  }
+});
+
+// ─── NOVO PRODUTO INLINE ──────────────────────────────────────────
+window.saveNovoProduto=async function(){
+  const nome=document.getElementById('npNome').value.trim();
+  if(!nome){toast('Preencha o nome do produto.','error');return;}
+  const item={
+    id:uid(),
+    codigo:document.getElementById('npCodigo').value||'SKU-'+uid().slice(0,4).toUpperCase(),
+    nome, categoria:document.getElementById('npCategoria').value,
+    estoque:Number(document.getElementById('npEstoque').value),
+    minimo:Number(document.getElementById('npMinimo').value),
+    custo:Number(document.getElementById('npCusto').value),
+    local:document.getElementById('npLocal').value, obs:''
+  };
+  state.estoque.push(item);
+  await upsertDoc('estoque', item);
+  selectProd(item.id);
+  ['npCodigo','npNome','npEstoque','npMinimo','npCusto','npLocal'].forEach(f=>{const el=document.getElementById(f);if(el)el.value='';});
+  document.getElementById('addProdSection').classList.remove('open');
+  toast('Produto cadastrado e selecionado!');
+};
+
+// ─── NOVO FORNECEDOR INLINE ───────────────────────────────────────
+window.saveNovoFornecedor=async function(){
+  const nome=document.getElementById('nfNome').value.trim();
+  if(!nome){toast('Preencha o nome do fornecedor.','error');return;}
+  const f={
+    id:uid(), nome,
+    cnpj:document.getElementById('nfCnpj').value,
+    telefone:document.getElementById('nfTel').value,
+    email:document.getElementById('nfEmail').value,
+    contato:document.getElementById('nfContato').value,
+    categoria:'', avaliacao:3
+  };
+  state.fornecedores.push(f);
+  await upsertDoc('fornecedores', f);
+  selectForn(f.id);
+  ['nfNome','nfCnpj','nfTel','nfEmail','nfContato'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  document.getElementById('addFornSection').classList.remove('open');
+  toast('Fornecedor cadastrado e selecionado!');
+};
+
+// ─── SOLICITAÇÕES ─────────────────────────────────────────────────
+window.saveSolicitacao=async function(){
+  const prodId=document.getElementById('solProdId').value;
+  const solId=document.getElementById('solSolicitanteId').value;
+  if(!prodId){toast('Selecione um produto.','error');return;}
+  if(!solId){toast('Selecione um solicitante.','error');return;}
+  const total=(state.solicitacoes?.length||0)+1;
+  const s={
+    id:uid(),
+    numero:'SOL-'+String(total).padStart(4,'0'),
+    produtoId:prodId,
+    fornecedorId:document.getElementById('solFornId').value||null,
+    qtd:Number(document.getElementById('solQtd').value)||1,
+    prioridade:document.getElementById('solPrioridade').value,
+    solicitanteId:solId,
+    justificativa:document.getElementById('solJustificativa').value,
+    data:new Date().toISOString().slice(0,10),
+    status:'Pendente', compra:null
+  };
+  state.solicitacoes.unshift(s);
+  await upsertDoc('solicitacoes', s);
+  // limpar form
+  ['solProdId','solFornId','solSolicitanteId'].forEach(id=>document.getElementById(id).value='');
+  ['solProdSearch','solFornSearch','solSolicitanteSearch','solJustificativa'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('solQtd').value='1';
+  document.getElementById('prodSelectedInfo').style.display='none';
+  document.getElementById('fornSelectedInfo').style.display='none';
+  renderSolicitacoes();
+  toast('Solicitação registrada!');
+};
+
+function renderSolicitacoes(){
+  const body=document.getElementById('solBody');
+  const filtro=document.getElementById('filtroStatus')?.value||'';
+  let lista=state.solicitacoes||[];
+  if(filtro) lista=lista.filter(s=>s.status===filtro);
+  if(!lista.length){body.innerHTML='<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted)">Nenhuma solicitação.</td></tr>';return;}
+  const canDelete=(userRole==='admin'||userRole==='comprador');
+  body.innerHTML=lista.map(s=>{
+    const prod=getProduto(s.produtoId);
+    const forn=s.fornecedorId?getFornecedor(s.fornecedorId):{nome:'—'};
+    const sol=getSolicitante(s.solicitanteId);
+    const compraInfo=s.compra?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${s.compra.tipo==='Comprou'?'🛒':'💬'} ${fmt(s.compra.valor||0)} × ${s.compra.qtd||''} ${s.compra.previsao?'| Prev: '+fmtDate(s.compra.previsao):''}</div>`:'';
+    return `<tr>
+      <td><b style="font-size:12px">${s.numero}</b></td>
+      <td><b>${prod.nome}</b><div style="font-size:11px;color:var(--muted)">${prod.codigo} | Qtd: ${s.qtd}</div>${compraInfo}</td>
+      <td>${s.qtd}</td>
+      <td>${sol.nome}</td>
+      <td><span class="badge ${prioColor(s.prioridade)}">${s.prioridade}</span></td>
+      <td>${forn.nome}</td>
+      <td>${statusBadge(s.status)}</td>
+      <td><div class="actions">
+        ${s.status!=='Cancelado'&&s.status!=='Comprou'&&userRole!=='consultor'
+          ?`<button class="btn btn-warn btn-xs" onclick="abrirCompra('${s.id}')">Comprar / Cotar</button>`:''}
+        ${canDelete?`<button class="btn btn-danger btn-xs" onclick="delSol('${s.id}')">Excluir</button>`:''}
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+// ─── MODAL COMPRA/COTAÇÃO ─────────────────────────────────────────
+window.abrirCompra=function(solId){
+  const s=state.solicitacoes.find(x=>x.id===solId);
+  document.getElementById('compraSOLID').value=solId;
+  document.getElementById('modalCompraTitle').textContent=`Ação — ${getProduto(s.produtoId).nome}`;
+  document.getElementById('compraData').value=new Date().toISOString().slice(0,10);
+  document.getElementById('compraQtd').value=s.qtd;
+  document.getElementById('compraObs').value='';
+  document.getElementById('compraValor').value='0';
+  populateSelects();
+  if(s.fornecedorId) setTimeout(()=>document.getElementById('compraForn').value=s.fornecedorId,50);
+  toggleCompraFields();
+  openModal('modalCompra');
+};
+
+window.toggleCompraFields=function(){
+  const tipo=document.getElementById('compraTipo').value;
+  document.getElementById('compraFields').style.display=tipo==='Comprou'?'':'none';
+};
+
+window.saveCompra=async function(){
+  const solId=document.getElementById('compraSOLID').value;
+  const tipo=document.getElementById('compraTipo').value;
+  const s=state.solicitacoes.find(x=>x.id===solId);
+  s.status=tipo;
+  s.fornecedorId=document.getElementById('compraForn').value||s.fornecedorId;
+  s.compra={
+    tipo,
+    fornecedorId:s.fornecedorId,
+    valor:tipo==='Comprou'?Number(document.getElementById('compraValor').value):0,
+    qtd:tipo==='Comprou'?Number(document.getElementById('compraQtd').value):s.qtd,
+    data:tipo==='Comprou'?document.getElementById('compraData').value:'',
+    previsao:tipo==='Comprou'?document.getElementById('compraPrevisao').value:'',
+    obs:document.getElementById('compraObs').value
+  };
+  await upsertDoc('solicitacoes', s);
+  closeModal('modalCompra');
+  renderSolicitacoes();
+  toast(tipo==='Comprou'?'Compra registrada!':'Cotação registrada!');
+};
+
+window.delSol=async function(id){
+  if(!confirm('Excluir esta solicitação?'))return;
+  state.solicitacoes=state.solicitacoes.filter(x=>x.id!==id);
+  await deleteDocument('solicitacoes', id);
+  renderSolicitacoes();
+  toast('Solicitação excluída.','error');
+};
+
+// ─── ESTOQUE ─────────────────────────────────────────────────────
+function renderEstoque(){
+  const body=document.getElementById('estoqueBody');
+  if(!state.estoque.length){body.innerHTML='<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--muted)">Nenhum produto.</td></tr>';return;}
+  body.innerHTML=state.estoque.map(e=>{
+    const s=e.estoque===0?'Crítico':e.estoque<e.minimo?'Baixo':'Em Estoque';
+    const sc=s==='Crítico'?'badge-red':s==='Baixo'?'badge-warn':'badge-green';
+    return `<tr>
+      <td><code style="font-size:11px;color:var(--muted)">${e.codigo}</code></td>
+      <td><b>${e.nome}</b></td>
+      <td><span class="badge badge-gray">${e.categoria}</span></td>
+      <td><b style="color:${s==='Crítico'?'var(--danger)':s==='Baixo'?'var(--warn)':'var(--accent2)'}">${e.estoque}</b></td>
+      <td>${e.minimo}</td><td>${fmt(e.custo)}</td>
+      <td style="font-size:12px;color:var(--muted)">${e.local}</td>
+      <td><span class="badge ${sc}">${s}</span></td>
+      <td><div class="actions">
+        <button class="btn btn-secondary btn-xs" onclick="editEstoque('${e.id}')">Editar</button>
+        <button class="btn btn-danger btn-xs" onclick="delEstoque('${e.id}')">Excluir</button>
+      </div></td>
+    </tr>`;
+  }).join('');
+}
+
+window.saveEstoque=async function(){
+  const id=document.getElementById('eId').value;
+  const item={
+    id:id||uid(),
+    codigo:document.getElementById('eCodigo').value||'SKU-'+uid().slice(0,4).toUpperCase(),
+    nome:document.getElementById('eNome').value,
+    categoria:document.getElementById('eCategoria').value,
+    estoque:Number(document.getElementById('eEstoque').value),
+    minimo:Number(document.getElementById('eMinimo').value),
+    custo:Number(document.getElementById('eCusto').value),
+    local:document.getElementById('eLocal').value,
+    obs:document.getElementById('eObs').value,
+  };
+  if(!item.nome){toast('Preencha o nome.','error');return;}
+  if(id){const i=state.estoque.findIndex(e=>e.id===id);state.estoque[i]=item;}
+  else state.estoque.push(item);
+  await upsertDoc('estoque', item);
+  closeModal('modalEstoque'); renderEstoque();
+  toast(id?'Produto atualizado!':'Produto adicionado!');
+};
+
+window.editEstoque=function(id){
+  const e=state.estoque.find(x=>x.id===id);
+  document.getElementById('modalEstoqueTitle').textContent='Editar Produto';
+  document.getElementById('eId').value=e.id;
+  document.getElementById('eCodigo').value=e.codigo;
+  document.getElementById('eNome').value=e.nome;
+  document.getElementById('eEstoque').value=e.estoque;
+  document.getElementById('eMinimo').value=e.minimo;
+  document.getElementById('eCusto').value=e.custo;
+  document.getElementById('eLocal').value=e.local;
+  document.getElementById('eObs').value=e.obs||'';
+  openModal('modalEstoque');
+  setTimeout(()=>document.getElementById('eCategoria').value=e.categoria,50);
+};
+
+window.delEstoque=async function(id){
+  if(!confirm('Excluir este produto?'))return;
+  state.estoque=state.estoque.filter(e=>e.id!==id);
+  await deleteDocument('estoque', id);
+  renderEstoque();
+  toast('Produto excluído.','error');
+};
+
+// ─── FORNECEDORES ─────────────────────────────────────────────────
+function renderFornecedores(){
+  const body=document.getElementById('fornecedoresBody');
+  if(!state.fornecedores.length){body.innerHTML='<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted)">Nenhum fornecedor.</td></tr>';return;}
+  body.innerHTML=state.fornecedores.map(f=>`<tr>
+    <td><b>${f.nome}</b></td>
+    <td><code style="font-size:11px;color:var(--muted)">${f.cnpj||'—'}</code></td>
+    <td>${f.contato||'—'}</td>
+    <td><a href="mailto:${f.email}" style="color:var(--accent)">${f.email||'—'}</a></td>
+    <td>${f.telefone||'—'}</td>
+    <td><span class="badge badge-gray">${f.categoria||'—'}</span></td>
+    <td>${stars(f.avaliacao||0)}</td>
+    <td><div class="actions">
+      <button class="btn btn-secondary btn-xs" onclick="editForn('${f.id}')">Editar</button>
+      <button class="btn btn-danger btn-xs" onclick="delForn('${f.id}')">Excluir</button>
+    </div></td>
+  </tr>`).join('');
+}
+
+window.saveFornecedor=async function(){
+  const id=document.getElementById('fId').value;
+  const f={
+    id:id||uid(), nome:document.getElementById('fNome').value,
+    cnpj:document.getElementById('fCnpj').value, contato:document.getElementById('fContato').value,
+    email:document.getElementById('fEmail').value, telefone:document.getElementById('fTel').value,
+    categoria:document.getElementById('fCategoria').value, avaliacao:document.getElementById('fAvaliacao').value
+  };
+  if(!f.nome){toast('Preencha o nome.','error');return;}
+  if(id){const i=state.fornecedores.findIndex(x=>x.id===id);state.fornecedores[i]=f;}
+  else state.fornecedores.push(f);
+  await upsertDoc('fornecedores', f);
+  closeModal('modalFornecedor'); renderFornecedores();
+  toast(id?'Fornecedor atualizado!':'Fornecedor adicionado!');
+};
+
+window.editForn=function(id){
+  const f=state.fornecedores.find(x=>x.id===id);
+  document.getElementById('modalFornTitle').textContent='Editar Fornecedor';
+  document.getElementById('fId').value=f.id;
+  document.getElementById('fNome').value=f.nome;
+  document.getElementById('fCnpj').value=f.cnpj||'';
+  document.getElementById('fContato').value=f.contato||'';
+  document.getElementById('fEmail').value=f.email||'';
+  document.getElementById('fTel').value=f.telefone||'';
+  document.getElementById('fAvaliacao').value=f.avaliacao||3;
+  openModal('modalFornecedor');
+  setTimeout(()=>document.getElementById('fCategoria').value=f.categoria,50);
+};
+
+window.delForn=async function(id){
+  if(!confirm('Excluir este fornecedor?'))return;
+  state.fornecedores=state.fornecedores.filter(x=>x.id!==id);
+  await deleteDocument('fornecedores', id);
+  renderFornecedores();
+  toast('Fornecedor excluído.','error');
+};
+
+// ─── SOLICITANTES ─────────────────────────────────────────────────
+function renderSolicitantes(){
+  const body=document.getElementById('solicitantesBody');
+  const lista=state.solicitantes||[];
+  if(!lista.length){body.innerHTML='<tr><td colspan="4" style="text-align:center;padding:30px;color:var(--muted)">Nenhum solicitante cadastrado.</td></tr>';return;}
+  body.innerHTML=lista.map(s=>`<tr>
+    <td><b>${s.nome}</b></td>
+    <td>${s.setor||'—'}</td>
+    <td>${s.email||'—'}</td>
+    <td><div class="actions">
+      <button class="btn btn-secondary btn-xs" onclick="editSolicitante('${s.id}')">Editar</button>
+      <button class="btn btn-danger btn-xs" onclick="delSolicitante('${s.id}')">Excluir</button>
+    </div></td>
+  </tr>`).join('');
+}
+
+window.saveSolicitante=async function(){
+  const id=document.getElementById('slId').value;
+  const s={
+    id:id||uid(),
+    nome:document.getElementById('slNome').value.trim(),
+    setor:document.getElementById('slSetor').value,
+    email:document.getElementById('slEmail').value
+  };
+  if(!s.nome){toast('Preencha o nome.','error');return;}
+  if(!state.solicitantes) state.solicitantes=[];
+  if(id){const i=state.solicitantes.findIndex(x=>x.id===id);state.solicitantes[i]=s;}
+  else state.solicitantes.push(s);
+  await upsertDoc('solicitantes', s);
+  closeModal('modalSolicitante'); renderSolicitantes();
+  toast(id?'Solicitante atualizado!':'Solicitante adicionado!');
+};
+
+window.editSolicitante=function(id){
+  const s=state.solicitantes.find(x=>x.id===id);
+  document.getElementById('modalSolTitle').textContent='Editar Solicitante';
+  document.getElementById('slId').value=s.id;
+  document.getElementById('slNome').value=s.nome;
+  document.getElementById('slSetor').value=s.setor||'';
+  document.getElementById('slEmail').value=s.email||'';
+  openModal('modalSolicitante');
+};
+
+window.delSolicitante=async function(id){
+  if(!confirm('Excluir?'))return;
+  state.solicitantes=state.solicitantes.filter(x=>x.id!==id);
+  await deleteDocument('solicitantes', id);
+  renderSolicitantes();
+  toast('Excluído.','error');
+};
+
+// ─── RELATÓRIOS ───────────────────────────────────────────────────
+function renderRelatorios(){
+  const valor=state.estoque.reduce((a,e)=>a+e.estoque*e.custo,0);
+  const criticos=state.estoque.filter(e=>e.estoque===0).length;
+  const baixos=state.estoque.filter(e=>e.estoque>0&&e.estoque<e.minimo).length;
+  const compraram=(state.solicitacoes||[]).filter(s=>s.status==='Comprou').length;
+  document.getElementById('relCards').innerHTML=`
+    <div class="card c-green"><div class="card-label">Valor em Estoque</div><div class="card-value" style="font-size:18px">${fmt(valor)}</div></div>
+    <div class="card c-red"><div class="card-label">Itens Críticos</div><div class="card-value">${criticos}</div></div>
+    <div class="card c-warn"><div class="card-label">Estoque Baixo</div><div class="card-value">${baixos}</div></div>
+    <div class="card c-blue"><div class="card-label">Compras Realizadas</div><div class="card-value">${compraram}</div></div>
+  `;
+  const cats={};
+  state.estoque.forEach(e=>{
+    if(!cats[e.categoria]) cats[e.categoria]={itens:0,valor:0,criticos:0};
+    cats[e.categoria].itens++;
+    cats[e.categoria].valor+=e.estoque*e.custo;
+    if(e.estoque<e.minimo) cats[e.categoria].criticos++;
+  });
+  document.getElementById('relCatBody').innerHTML=Object.entries(cats).map(([c,v])=>`<tr>
+    <td><span class="badge badge-gray">${c}</span></td>
+    <td>${v.itens}</td><td>${fmt(v.valor)}</td>
+    <td>${v.criticos>0?`<span style="color:var(--danger)">${v.criticos}</span>`:'<span style="color:var(--accent2)">0</span>'}</td>
+  </tr>`).join('')||'<tr><td colspan="4" style="text-align:center;padding:20px;color:var(--muted)">Sem dados.</td></tr>';
+}
+
+// ─── CONFIGURAÇÕES ────────────────────────────────────────────────
+function renderConfiguracoes(){
+  document.getElementById('cfgEmpresa').value=state.config?.empresa||'';
+  document.getElementById('cfgCnpj').value=state.config?.cnpj||'';
+  renderCatList();
+}
+window.saveConfig=async function(){
+  if(!state.config) state.config={};
+  state.config.empresa=document.getElementById('cfgEmpresa').value;
+  state.config.cnpj=document.getElementById('cfgCnpj').value;
+  document.getElementById('empresaLabel').textContent=state.config.empresa;
+  await saveConfig();
+  toast('Configurações salvas!');
+};
+function renderCatList(){
+  document.getElementById('catList').innerHTML=(state.categorias||[]).map(c=>`
+    <span style="background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:4px 10px;font-size:12px;display:flex;align-items:center;gap:6px">
+      ${c}<span onclick="delCat('${c}')" style="cursor:pointer;color:var(--muted)">×</span>
+    </span>`).join('');
+}
+window.addCat=async function(){
+  const v=document.getElementById('newCat').value.trim();
+  if(!v||state.categorias?.includes(v))return;
+  if(!state.categorias) state.categorias=[];
+  state.categorias.push(v);
+  await saveConfig();
+  renderCatList();
+  document.getElementById('newCat').value='';
+};
+window.delCat=async function(c){
+  state.categorias=state.categorias.filter(x=>x!==c);
+  await saveConfig();
+  renderCatList();
+};
+
+// ─── EXPORT CSV ───────────────────────────────────────────────────
+window.exportCSV=function(type){
+  let rows,headers;
+  if(type==='estoque'){
+    headers=['Código','Produto','Categoria','Estoque','Mínimo','Custo Unit.','Localização'];
+    rows=state.estoque.map(e=>[e.codigo,e.nome,e.categoria,e.estoque,e.minimo,e.custo,e.local]);
+  } else if(type==='solicitacoes'){
+    headers=['Número','Produto','Qtd','Solicitante','Prioridade','Fornecedor','Status','Data','Valor Compra','Previsão Entrega'];
+    rows=(state.solicitacoes||[]).map(s=>[
+      s.numero, getProduto(s.produtoId).nome, s.qtd,
+      getSolicitante(s.solicitanteId).nome, s.prioridade,
+      s.fornecedorId?getFornecedor(s.fornecedorId).nome:'',
+      s.status, s.data,
+      s.compra?.valor||'', s.compra?.previsao||''
+    ]);
+  } else {
+    headers=['Nome','CNPJ','Contato','Email','Telefone'];
+    rows=state.fornecedores.map(f=>[f.nome,f.cnpj,f.contato,f.email,f.telefone]);
+  }
+  const csv=[headers,...rows].map(r=>r.map(c=>`"${c||''}"`).join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);
+  a.download='estoque_'+type+'_'+Date.now()+'.csv'; a.click();
+  toast('Exportado!');
+};
+
+</script>
+</body>
+</html>
