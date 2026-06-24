@@ -221,133 +221,30 @@ select option{background:var(--surface2);}
   </header>
   <div class="content">
 
-    <!-- SOLICITAÇÕES (comprador + consultor + admin) -->
+    <!-- SOLICITAÇÕES -->
     <div id="page-solicitacoes" class="page">
-      <div class="sol-layout">
-
-        <!-- PAINEL ESQUERDO: FORMULÁRIO -->
-        <div id="solFormPanel" class="sol-panel">
-          <h4>➕ Nova Solicitação</h4>
-
-          <!-- PRODUTO -->
-          <div class="fg">
-            <label>Produto *</label>
-            <div class="dropdown-wrap">
-              <input class="search-input" id="solProdSearch" placeholder="Buscar por nome ou código..." autocomplete="off" oninput="filterProdDrop()" onfocus="openProdDrop()">
-              <div class="dropdown-list" id="prodDropList"></div>
-            </div>
-            <input type="hidden" id="solProdId">
-          </div>
-          <div id="prodSelectedInfo" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:10px;color:var(--muted)"></div>
-
-          <!-- NOVO PRODUTO (colapsável) -->
-          <button class="collapse-btn" onclick="toggleCollapse('addProdSection', this)">+ Cadastrar novo produto</button>
-          <div class="collapse-section" id="addProdSection">
-            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin:10px 0;">
-              <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:12px;">📦 Novo Produto</div>
-              <div class="form-row">
-                <div class="fg"><label>Código</label><input id="npCodigo" placeholder="SKU-001"></div>
-                <div class="fg"><label>Categoria</label><select id="npCategoria"></select></div>
-              </div>
-              <div class="fg"><label>Nome *</label><input id="npNome" placeholder="Nome do produto"></div>
-              <div class="form-row">
-                <div class="fg"><label>Estoque Atual</label><input id="npEstoque" type="number" value="0" min="0"></div>
-                <div class="fg"><label>Estoque Mínimo</label><input id="npMinimo" type="number" value="10" min="0"></div>
-              </div>
-              <div class="form-row">
-                <div class="fg"><label>Custo Unit. (R$)</label><input id="npCusto" type="number" value="0" step="0.01" min="0"></div>
-                <div class="fg"><label>Localização</label><input id="npLocal" placeholder="Prateleira A1"></div>
-              </div>
-              <button class="btn btn-primary btn-sm" onclick="saveNovoProduto()" style="width:100%">✓ Salvar Produto e Selecionar</button>
-            </div>
-          </div>
-
-          <hr class="divider">
-
-          <!-- FORNECEDOR -->
-          <div class="fg">
-            <label>Fornecedor (opcional)</label>
-            <div class="dropdown-wrap">
-              <input class="search-input" id="solFornSearch" placeholder="Buscar fornecedor..." autocomplete="off" oninput="filterFornDrop()" onfocus="openFornDrop()">
-              <div class="dropdown-list" id="fornDropList"></div>
-            </div>
-            <input type="hidden" id="solFornId">
-          </div>
-          <div id="fornSelectedInfo" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:10px;color:var(--muted)"></div>
-
-          <!-- NOVO FORNECEDOR (colapsável) -->
-          <button class="collapse-btn" onclick="toggleCollapse('addFornSection', this)">+ Cadastrar novo fornecedor</button>
-          <div class="collapse-section" id="addFornSection">
-            <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin:10px 0;">
-              <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:12px;">🏭 Novo Fornecedor</div>
-              <div class="fg"><label>Nome *</label><input id="nfNome" placeholder="Razão Social"></div>
-              <div class="form-row">
-                <div class="fg"><label>CNPJ</label><input id="nfCnpj" placeholder="00.000.000/0001-00"></div>
-                <div class="fg"><label>Telefone</label><input id="nfTel" placeholder="(11) 99999-0000"></div>
-              </div>
-              <div class="form-row">
-                <div class="fg"><label>Email</label><input id="nfEmail" type="email" placeholder="contato@empresa.com"></div>
-                <div class="fg"><label>Contato</label><input id="nfContato" placeholder="Nome do contato"></div>
-              </div>
-              <button class="btn btn-primary btn-sm" onclick="saveNovoFornecedor()" style="width:100%">✓ Salvar Fornecedor e Selecionar</button>
-            </div>
-          </div>
-
-          <hr class="divider">
-
-          <!-- RESTANTE DA SOLICITAÇÃO -->
-          <div class="form-row">
-            <div class="fg"><label>Quantidade *</label><input id="solQtd" type="number" value="1" min="1"></div>
-            <div class="fg"><label>Prioridade</label>
-              <select id="solPrioridade">
-                <option value="Baixa">Baixa</option>
-                <option value="Normal" selected>Normal</option>
-                <option value="Alta">Alta</option>
-                <option value="Urgente">Urgente</option>
-              </select>
-            </div>
-          </div>
-
-          <!-- SOLICITANTE -->
-          <div class="fg">
-            <label>Solicitante *</label>
-            <div class="dropdown-wrap">
-              <input class="search-input" id="solSolicitanteSearch" placeholder="Buscar solicitante..." autocomplete="off" oninput="filterSolicitanteDrop()" onfocus="openSolicitanteDrop()">
-              <div class="dropdown-list" id="solicitanteDropList"></div>
-            </div>
-            <input type="hidden" id="solSolicitanteId">
-          </div>
-
-          <div class="fg"><label>Justificativa</label><textarea id="solJustificativa" rows="2" style="resize:vertical"></textarea></div>
-
-          <button class="btn btn-primary" style="width:100%" onclick="saveSolicitacao()">✓ Registrar Solicitação</button>
-        </div>
-
-        <!-- PAINEL DIREITO: LISTA -->
-        <div>
-          <div class="table-wrap">
-            <div class="table-header">
-              <span class="table-title">Solicitações</span>
-              <div style="display:flex;gap:8px;flex-wrap:wrap">
-                <input class="search-input" placeholder="🔍 Buscar..." oninput="filterTable('solTable',this.value)" style="width:180px">
-                <select class="search-input" id="filtroStatus" onchange="renderSolicitacoes()" style="width:140px">
-                  <option value="">Todos os status</option>
-                  <option value="Pendente">Pendente</option>
-                  <option value="Em Cotação">Em Cotação</option>
-                  <option value="Comprou">Comprou</option>
-                  <option value="Cancelado">Cancelado</option>
-                </select>
-              </div>
-            </div>
-            <table id="solTable">
-              <thead><tr>
-                <th>ID</th><th>Produto</th><th>Qtd</th><th>Solicitante</th>
-                <th>Prioridade</th><th>Fornecedor</th><th>Status</th><th>Ações</th>
-              </tr></thead>
-              <tbody id="solBody"></tbody>
-            </table>
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">Solicitações</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input class="search-input" placeholder="🔍 Buscar..." oninput="filterTable('solTable',this.value)" style="width:180px">
+            <select class="search-input" id="filtroStatus" onchange="renderSolicitacoes()" style="width:150px">
+              <option value="">Todos os status</option>
+              <option value="Pendente">Pendente</option>
+              <option value="Em Cotação">Em Cotação</option>
+              <option value="Comprou">Comprou</option>
+              <option value="Cancelado">Cancelado</option>
+            </select>
+            <button class="btn btn-primary" id="btnNovaSol" onclick="openModal('modalNovaSol')">+ Nova Solicitação</button>
           </div>
         </div>
+        <table id="solTable">
+          <thead><tr>
+            <th>ID</th><th>Produto</th><th>Qtd</th><th>Solicitante</th>
+            <th>Prioridade</th><th>Fornecedor</th><th>Status</th><th>Ações</th>
+          </tr></thead>
+          <tbody id="solBody"></tbody>
+        </table>
       </div>
     </div>
 
@@ -440,6 +337,106 @@ select option{background:var(--surface2);}
       </div>
     </div>
 
+  </div>
+</div>
+
+<!-- MODAL NOVA SOLICITAÇÃO -->
+<div class="modal-bg" id="modalNovaSol">
+  <div class="modal modal-lg">
+    <h3>Nova Solicitação</h3>
+
+    <!-- PRODUTO -->
+    <div class="fg">
+      <label>Produto *</label>
+      <div class="dropdown-wrap">
+        <input class="search-input" id="solProdSearch" placeholder="Buscar por nome ou código..." autocomplete="off" oninput="filterProdDrop()" onfocus="openProdDrop()" style="width:100%">
+        <div class="dropdown-list" id="prodDropList"></div>
+      </div>
+      <input type="hidden" id="solProdId">
+    </div>
+    <div id="prodSelectedInfo" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:4px;color:var(--muted)"></div>
+
+    <button class="collapse-btn" onclick="toggleCollapse('addProdSection',this)">+ Cadastrar novo produto</button>
+    <div class="collapse-section" id="addProdSection">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin:8px 0 12px;">
+        <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:10px;">📦 Novo Produto</div>
+        <div class="form-row">
+          <div class="fg"><label>Código</label><input id="npCodigo" placeholder="SKU-001"></div>
+          <div class="fg"><label>Categoria</label><select id="npCategoria"></select></div>
+        </div>
+        <div class="fg"><label>Nome *</label><input id="npNome" placeholder="Nome do produto"></div>
+        <div class="form-row">
+          <div class="fg"><label>Estoque Atual</label><input id="npEstoque" type="number" value="0" min="0"></div>
+          <div class="fg"><label>Estoque Mínimo</label><input id="npMinimo" type="number" value="10" min="0"></div>
+        </div>
+        <div class="form-row">
+          <div class="fg"><label>Custo Unit. (R$)</label><input id="npCusto" type="number" value="0" step="0.01" min="0"></div>
+          <div class="fg"><label>Localização</label><input id="npLocal" placeholder="Prateleira A1"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="saveNovoProduto()" style="width:100%">✓ Salvar Produto e Selecionar</button>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- FORNECEDOR -->
+    <div class="fg">
+      <label>Fornecedor (opcional)</label>
+      <div class="dropdown-wrap">
+        <input class="search-input" id="solFornSearch" placeholder="Buscar fornecedor..." autocomplete="off" oninput="filterFornDrop()" onfocus="openFornDrop()" style="width:100%">
+        <div class="dropdown-list" id="fornDropList"></div>
+      </div>
+      <input type="hidden" id="solFornId">
+    </div>
+    <div id="fornSelectedInfo" style="display:none;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;font-size:12px;margin-bottom:4px;color:var(--muted)"></div>
+
+    <button class="collapse-btn" onclick="toggleCollapse('addFornSection',this)">+ Cadastrar novo fornecedor</button>
+    <div class="collapse-section" id="addFornSection">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:14px;margin:8px 0 12px;">
+        <div style="font-size:12px;font-weight:600;color:var(--accent);margin-bottom:10px;">🏭 Novo Fornecedor</div>
+        <div class="fg"><label>Nome *</label><input id="nfNome" placeholder="Razão Social"></div>
+        <div class="form-row">
+          <div class="fg"><label>CNPJ</label><input id="nfCnpj" placeholder="00.000.000/0001-00"></div>
+          <div class="fg"><label>Telefone</label><input id="nfTel" placeholder="(11) 99999-0000"></div>
+        </div>
+        <div class="form-row">
+          <div class="fg"><label>Email</label><input id="nfEmail" type="email" placeholder="contato@empresa.com"></div>
+          <div class="fg"><label>Contato</label><input id="nfContato" placeholder="Nome do contato"></div>
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="saveNovoFornecedor()" style="width:100%">✓ Salvar Fornecedor e Selecionar</button>
+      </div>
+    </div>
+
+    <hr class="divider">
+
+    <!-- QTD + PRIORIDADE + SOLICITANTE -->
+    <div class="form-row">
+      <div class="fg"><label>Quantidade *</label><input id="solQtd" type="number" value="1" min="1"></div>
+      <div class="fg"><label>Prioridade</label>
+        <select id="solPrioridade">
+          <option value="Baixa">Baixa</option>
+          <option value="Normal" selected>Normal</option>
+          <option value="Alta">Alta</option>
+          <option value="Urgente">Urgente</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="fg">
+      <label>Solicitante *</label>
+      <div class="dropdown-wrap">
+        <input class="search-input" id="solSolicitanteSearch" placeholder="Buscar solicitante..." autocomplete="off" oninput="filterSolicitanteDrop()" onfocus="openSolicitanteDrop()" style="width:100%">
+        <div class="dropdown-list" id="solicitanteDropList"></div>
+      </div>
+      <input type="hidden" id="solSolicitanteId">
+    </div>
+
+    <div class="fg"><label>Justificativa</label><textarea id="solJustificativa" rows="2" style="resize:vertical"></textarea></div>
+
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModal('modalNovaSol')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveSolicitacao()">✓ Registrar Solicitação</button>
+    </div>
   </div>
 </div>
 
@@ -765,8 +762,8 @@ window.goTo=function(page){
   if(page==='solicitantes') renderSolicitantes();
   if(page==='relatorios') renderRelatorios();
   if(page==='configuracoes') renderConfiguracoes();
-  const panel=document.getElementById('solFormPanel');
-  if(panel) panel.style.display=(userRole==='consultor')?'none':'';
+
+  const btnNovaSol=document.getElementById('btnNovaSol'); if(btnNovaSol) btnNovaSol.style.display=(userRole==='consultor')?'none':'';
 };
 
 // ─── HELPERS ─────────────────────────────────────────────────────
@@ -951,6 +948,8 @@ window.saveSolicitacao=async function(){
   document.getElementById('solQtd').value='1';
   document.getElementById('prodSelectedInfo').style.display='none';
   document.getElementById('fornSelectedInfo').style.display='none';
+  ['addProdSection','addFornSection'].forEach(id=>{const el=document.getElementById(id);if(el)el.classList.remove('open');});
+  closeModal('modalNovaSol');
   renderSolicitacoes();
   toast('Solicitação registrada!');
 };
