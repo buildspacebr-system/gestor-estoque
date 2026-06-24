@@ -273,9 +273,7 @@ select option{background:var(--surface2);}
     <button class="mob-menu-btn" id="mobMenuBtn" onclick="openMobMenu()" style="display:none">☰</button>
     <div class="page-title" id="pageTitle">Carregando...</div>
     <div style="display:flex;align-items:center;gap:10px">
-      <div id="autoRefreshIndicator" style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px">
-        <span id="refreshCountdown" style="font-family:monospace"></span>
-      </div>
+      <span id="lastRefresh" style="font-size:11px;color:var(--muted)"></span>
       <button class="btn btn-secondary btn-sm" id="btnRefresh" onclick="manualRefresh()" title="Atualizar dados">
         <span id="refreshIcon">🔄</span> Atualizar
       </button>
@@ -367,7 +365,8 @@ select option{background:var(--surface2);}
               <option value="">Todos os tipos</option>
               <option value="Saída">Saída (Solicitação)</option>
               <option value="Entrada">Entrada (Compra)</option>
-              <option value="Ajuste">Ajuste Manual</option>
+              <option value="Ajuste (Solicitação)">Ajuste (Solicitação)</option>
+              <option value="Estorno (Exclusão)">Estorno (Exclusão)</option>
             </select>
           </div>
         </div>
@@ -796,7 +795,7 @@ window.doLogin = async function(){
 };
 
 window.doLogout=async function(){
-  if(confirm('Deseja sair?')){ stopAutoRefresh(); await signOut(auth); }
+  if(confirm('Deseja sair?')) await signOut(auth);
 };
 
 document.getElementById('loginPassword').addEventListener('keydown',e=>{
@@ -820,7 +819,7 @@ onAuthStateChanged(auth, async(user)=>{
     document.getElementById('empresaLabel').textContent=state.config?.empresa||'Gestor de Estoque';
     document.getElementById('loadingOverlay').classList.add('hidden');
     goTo(MENUS[userRole]?.[0]?.id||'solicitacoes');
-    startAutoRefresh();
+    updateLastRefresh();
   } else {
     currentUser=null; userRole=null;
     document.getElementById('loginScreen').classList.remove('hidden');
@@ -831,38 +830,25 @@ onAuthStateChanged(auth, async(user)=>{
 });
 
 // ─── NAV ─────────────────────────────────────────────────────────
-// ─── AUTO REFRESH ────────────────────────────────────────────────
-let autoRefreshInterval = null;
-let countdownInterval  = null;
-let currentPage        = 'solicitacoes';
-const REFRESH_SECS     = 30;
+// ─── REFRESH MANUAL ──────────────────────────────────────────────
+let currentPage = 'solicitacoes';
 
-function startAutoRefresh() {
-  stopAutoRefresh();
-  let secs = REFRESH_SECS;
-  const cd = document.getElementById('refreshCountdown');
-  if(cd) cd.textContent = secs + 's';
-
-  countdownInterval = setInterval(() => {
-    secs--;
-    if(cd) cd.textContent = secs + 's';
-    if(secs <= 0) secs = REFRESH_SECS;
-  }, 1000);
-
-  autoRefreshInterval = setInterval(async () => {
-    await silentRefresh();
-    secs = REFRESH_SECS;
-  }, REFRESH_SECS * 1000);
+function rerenderCurrentPage() {
+  if(currentPage==='solicitacoes') renderSolicitacoes();
+  else if(currentPage==='estoque') renderEstoque();
+  else if(currentPage==='fornecedores') renderFornecedores();
+  else if(currentPage==='solicitantes') renderSolicitantes();
+  else if(currentPage==='movimentacoes') renderMovimentacoes();
+  else if(currentPage==='relatorios') renderRelatorios();
+  else if(currentPage==='configuracoes') renderConfiguracoes();
 }
 
-function stopAutoRefresh() {
-  if(autoRefreshInterval) clearInterval(autoRefreshInterval);
-  if(countdownInterval)   clearInterval(countdownInterval);
-}
-
-async function silentRefresh() {
-  await loadFromFirestore();
-  rerenderCurrentPage();
+function updateLastRefresh() {
+  const el = document.getElementById('lastRefresh');
+  if(el) {
+    const now = new Date();
+    el.textContent = 'Atualizado às ' + now.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+  }
 }
 
 window.manualRefresh = async function() {
@@ -870,15 +856,14 @@ window.manualRefresh = async function() {
   const btn  = document.getElementById('btnRefresh');
   if(btn) btn.disabled = true;
   if(icon) icon.textContent = '⏳';
-  await silentRefresh();
+  await loadFromFirestore();
+  rerenderCurrentPage();
+  updateLastRefresh();
   if(icon) icon.textContent = '✓';
   setTimeout(() => {
     if(icon) icon.textContent = '🔄';
     if(btn)  btn.disabled = false;
   }, 1500);
-  // Resetar countdown
-  stopAutoRefresh();
-  startAutoRefresh();
 };
 
 function rerenderCurrentPage() {
@@ -1119,17 +1104,18 @@ window.saveSolicitacao=async function(){
   };
   state.solicitacoes.unshift(s);
   await upsertDoc('solicitacoes', s);
-  // Debitar estoque
+  // Atualizar estoque com o valor solicitado (substitui, não debita)
   const prodIdx=state.estoque.findIndex(e=>e.id===prodId);
   if(prodIdx>=0){
     const estoqueAntes=state.estoque[prodIdx].estoque;
-    state.estoque[prodIdx].estoque=Math.max(0, estoqueAntes - s.qtd);
+    const estoqueDepois=s.qtd;
+    state.estoque[prodIdx].estoque=estoqueDepois;
+    state.estoque[prodIdx]._estoqueAntesSol=estoqueAntes; // guardar para restaurar se excluir
     await upsertDoc('estoque', state.estoque[prodIdx]);
-    // Registrar movimentação
     const mov={
-      id:uid(), tipo:'Saída',
+      id:uid(), tipo:'Ajuste (Solicitação)',
       produtoId:prodId, produtoNome:state.estoque[prodIdx].nome,
-      qtd:s.qtd, estoqueAntes, estoqueDepois:state.estoque[prodIdx].estoque,
+      qtd:s.qtd, estoqueAntes, estoqueDepois,
       referencia:s.numero, referenciaId:s.id,
       usuario:currentUser?.email||'', dataHora:new Date().toISOString()
     };
@@ -1171,7 +1157,6 @@ function renderSolicitacoes(){
     return `<tr>
       <td>
         <div style="font-family:monospace;font-size:13px;font-weight:600;color:var(--text)">${prod.codigo||'—'}</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:2px">${s.numero}</div>
       </td>
       <td>
         <div style="font-weight:600;font-size:13px">${prod.nome}</div>
@@ -1270,10 +1255,35 @@ window.saveCompra=async function(){
 
 window.delSol=async function(id){
   if(!confirm('Excluir esta solicitação?'))return;
+  const sol=state.solicitacoes.find(x=>x.id===id);
+  // Restaurar estoque ao valor anterior à solicitação
+  if(sol){
+    const prodIdx=state.estoque.findIndex(e=>e.id===sol.produtoId);
+    if(prodIdx>=0){
+      // Buscar movimentação da solicitação para pegar estoqueAntes
+      const movSol=state.movimentacoes?.find(m=>m.referenciaId===id&&m.tipo==='Ajuste (Solicitação)');
+      const estoqueAntes=movSol?.estoqueAntes ?? state.estoque[prodIdx].estoque;
+      const estoqueDepois=estoqueAntes;
+      const estoqueAtual=state.estoque[prodIdx].estoque;
+      state.estoque[prodIdx].estoque=estoqueDepois;
+      await upsertDoc('estoque', state.estoque[prodIdx]);
+      // Registrar movimentação de estorno
+      const mov={
+        id:uid(), tipo:'Estorno (Exclusão)',
+        produtoId:sol.produtoId, produtoNome:state.estoque[prodIdx].nome,
+        qtd:sol.qtd, estoqueAntes:estoqueAtual, estoqueDepois,
+        referencia:sol.numero, referenciaId:sol.id,
+        usuario:currentUser?.email||'', dataHora:new Date().toISOString()
+      };
+      if(!state.movimentacoes) state.movimentacoes=[];
+      state.movimentacoes.unshift(mov);
+      await upsertDoc('movimentacoes', mov);
+    }
+  }
   state.solicitacoes=state.solicitacoes.filter(x=>x.id!==id);
   await deleteDocument('solicitacoes', id);
   renderSolicitacoes();
-  toast('Solicitação excluída.','error');
+  toast('Solicitação excluída e estoque restaurado.','error');
 };
 
 // ─── ESTOQUE ─────────────────────────────────────────────────────
