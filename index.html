@@ -356,6 +356,32 @@ select option{background:var(--surface2);}
       </div>
     </div>
 
+    <!-- MOVIMENTAÇÕES (admin) -->
+    <div id="page-movimentacoes" class="page">
+      <div class="table-wrap">
+        <div class="table-header">
+          <span class="table-title">Movimentações de Estoque</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+            <input class="search-input" placeholder="🔍 Buscar..." oninput="filterTable('movTable',this.value)" style="width:180px">
+            <select class="search-input" id="filtroMov" onchange="renderMovimentacoes()" style="width:150px">
+              <option value="">Todos os tipos</option>
+              <option value="Saída">Saída (Solicitação)</option>
+              <option value="Entrada">Entrada (Compra)</option>
+              <option value="Ajuste">Ajuste Manual</option>
+            </select>
+          </div>
+        </div>
+        <table id="movTable">
+          <thead><tr>
+            <th>Data/Hora</th><th>Tipo</th><th>Produto</th>
+            <th>Qtd</th><th>Estoque Antes</th><th>Estoque Depois</th>
+            <th>Referência</th><th>Usuário</th>
+          </tr></thead>
+          <tbody id="movBody"></tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- RELATÓRIOS (admin) -->
     <div id="page-relatorios" class="page">
       <div class="cards" id="relCards"></div>
@@ -519,8 +545,12 @@ select option{background:var(--surface2);}
     </div>
     <div id="compraFields">
       <div class="form-row">
-        <div class="fg"><label>Valor Unitário (R$)</label><input id="compraValor" type="number" step="0.01" min="0" value="0"></div>
-        <div class="fg"><label>Quantidade</label><input id="compraQtd" type="number" min="1" value="1"></div>
+        <div class="fg"><label>Quantidade</label><input id="compraQtd" type="number" min="1" value="1" oninput="calcTotal()"></div>
+        <div class="fg"><label>Valor Unitário (R$)</label><input id="compraValor" type="number" step="0.01" min="0" value="0" oninput="calcTotal()"></div>
+      </div>
+      <div class="fg">
+        <label>Valor Total</label>
+        <div id="compraTotal" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:9px 12px;font-size:15px;font-weight:600;color:var(--accent2)">R$ 0,00</div>
       </div>
       <div class="form-row">
         <div class="fg"><label>Data da Compra</label><input id="compraData" type="date"></div>
@@ -616,7 +646,7 @@ select option{background:var(--surface2);}
 <!-- Ponte global: permite onclick= no HTML chamar funções do módulo ES -->
 <script>
 window._mod = {};
-['doLogin','doLogout','goTo','filterTable','openModal','closeModal','toggleCollapse','openMobMenu','closeMobMenu','manualRefresh',
+['doLogin','doLogout','goTo','filterTable','openModal','closeModal','toggleCollapse','openMobMenu','closeMobMenu','manualRefresh','calcTotal',
  'openProdDrop','filterProdDrop','selectProd','openFornDrop','filterFornDrop','selectForn',
  'openSolicitanteDrop','filterSolicitanteDrop','selectSolicitante',
  'saveNovoProduto','saveNovoFornecedor','saveSolicitacao','abrirCompra',
@@ -661,7 +691,7 @@ const db   = getFirestore(app);
 
 // ─── STATE (em memória, carregado do Firestore) ───────────────────
 let state = {
-  estoque:[], solicitacoes:[], fornecedores:[], solicitantes:[],
+  estoque:[], solicitacoes:[], fornecedores:[], solicitantes:[], movimentacoes:[],
   categorias:['Escritório','Limpeza','TI','Manutenção','Copa','Segurança','Outros'],
   config:{ empresa:'Minha Empresa', cnpj:'' }
 };
@@ -675,6 +705,7 @@ const MENUS = {
     {id:'estoque',      icon:'📦', label:'Estoque'},
     {id:'fornecedores', icon:'🏭', label:'Fornecedores'},
     {id:'solicitantes', icon:'👥', label:'Solicitantes'},
+    {id:'movimentacoes',icon:'📒', label:'Movimentações'},
     {id:'relatorios',   icon:'📊', label:'Relatórios'},
     {id:'configuracoes',icon:'⚙️', label:'Configurações'},
   ],
@@ -693,17 +724,19 @@ const MENUS = {
 async function loadFromFirestore() {
   setStatus('⏳ Carregando...');
   try {
-    const [estoqueSnap, fornSnap, solSnap, solicitantesSnap, configSnap] = await Promise.all([
+    const [estoqueSnap, fornSnap, solSnap, solicitantesSnap, movSnap, configSnap] = await Promise.all([
       getDocs(query(collection(db,'estoque'))),
       getDocs(query(collection(db,'fornecedores'))),
       getDocs(query(collection(db,'solicitacoes'), orderBy('data','desc'))),
       getDocs(query(collection(db,'solicitantes'))),
+      getDocs(query(collection(db,'movimentacoes'), orderBy('dataHora','desc'))),
       getDoc(doc(db,'config','dados'))
     ]);
     state.estoque        = estoqueSnap.docs.map(d=>({...d.data(), _docId:d.id}));
     state.fornecedores   = fornSnap.docs.map(d=>({...d.data(), _docId:d.id}));
     state.solicitacoes   = solSnap.docs.map(d=>({...d.data(), _docId:d.id}));
     state.solicitantes   = solicitantesSnap.docs.map(d=>({...d.data(), _docId:d.id}));
+    state.movimentacoes  = movSnap.docs.map(d=>({...d.data(), _docId:d.id}));
     if (configSnap.exists()) {
       const cfg = configSnap.data();
       state.config     = cfg.config     || state.config;
@@ -853,6 +886,7 @@ function rerenderCurrentPage() {
   else if(currentPage==='estoque') renderEstoque();
   else if(currentPage==='fornecedores') renderFornecedores();
   else if(currentPage==='solicitantes') renderSolicitantes();
+  else if(currentPage==='movimentacoes') renderMovimentacoes();
   else if(currentPage==='relatorios') renderRelatorios();
   else if(currentPage==='configuracoes') renderConfiguracoes();
 }
@@ -902,6 +936,7 @@ window.goTo=function(page){
   if(page==='estoque') renderEstoque();
   if(page==='fornecedores') renderFornecedores();
   if(page==='solicitantes') renderSolicitantes();
+  if(page==='movimentacoes') renderMovimentacoes();
   if(page==='relatorios') renderRelatorios();
   if(page==='configuracoes') renderConfiguracoes();
 
@@ -1084,6 +1119,24 @@ window.saveSolicitacao=async function(){
   };
   state.solicitacoes.unshift(s);
   await upsertDoc('solicitacoes', s);
+  // Debitar estoque
+  const prodIdx=state.estoque.findIndex(e=>e.id===prodId);
+  if(prodIdx>=0){
+    const estoqueAntes=state.estoque[prodIdx].estoque;
+    state.estoque[prodIdx].estoque=Math.max(0, estoqueAntes - s.qtd);
+    await upsertDoc('estoque', state.estoque[prodIdx]);
+    // Registrar movimentação
+    const mov={
+      id:uid(), tipo:'Saída',
+      produtoId:prodId, produtoNome:state.estoque[prodIdx].nome,
+      qtd:s.qtd, estoqueAntes, estoqueDepois:state.estoque[prodIdx].estoque,
+      referencia:s.numero, referenciaId:s.id,
+      usuario:currentUser?.email||'', dataHora:new Date().toISOString()
+    };
+    if(!state.movimentacoes) state.movimentacoes=[];
+    state.movimentacoes.unshift(mov);
+    await upsertDoc('movimentacoes', mov);
+  }
   // limpar form
   ['solProdId','solFornId','solSolicitanteId'].forEach(id=>document.getElementById(id).value='');
   ['solProdSearch','solFornSearch','solSolicitanteSearch','solJustificativa'].forEach(id=>document.getElementById(id).value='');
@@ -1117,7 +1170,7 @@ function renderSolicitacoes(){
     const statusEstoque = prod.estoque===0?'<span style="color:var(--danger);font-size:10px">● Sem estoque</span>':prod.estoque<prod.minimo?'<span style="color:var(--warn);font-size:10px">● Estoque baixo</span>':'';
     return `<tr>
       <td>
-        <div style="font-family:monospace;font-size:12px;color:var(--muted)">${prod.codigo||s.numero}</div>
+        <div style="font-family:monospace;font-size:13px;font-weight:600;color:var(--text)">${prod.codigo||'—'}</div>
         <div style="font-size:10px;color:var(--muted);margin-top:2px">${s.numero}</div>
       </td>
       <td>
@@ -1132,9 +1185,9 @@ function renderSolicitacoes(){
         <div style="font-size:13px">${sol.nome}</div>
         <div style="font-size:11px;color:var(--muted);margin-top:2px">${fmtDate(s.data)}</div>
       </td>
-      <td><span class="badge ${prioColor(s.prioridade)}">${s.prioridade}</span></td>
-      <td style="font-size:13px">${forn.nome}</td>
-      <td>${statusBadge(s.status)}</td>
+      <td><div style="font-size:10px;color:var(--muted);font-weight:500;margin-bottom:3px">PRIORIDADE</div><span class="badge ${prioColor(s.prioridade)}">${s.prioridade}</span></td>
+      <td><div style="font-size:10px;color:var(--muted);font-weight:500;margin-bottom:3px">FORNECEDOR</div><span style="font-size:13px">${forn.nome}</span></td>
+      <td><div style="font-size:10px;color:var(--muted);font-weight:500;margin-bottom:3px">STATUS</div>${statusBadge(s.status)}</td>
       <td><div class="actions">
         ${s.status!=='Cancelado'&&s.status!=='Comprou'&&userRole!=='consultor'
           ?`<button class="btn btn-warn btn-xs" onclick="abrirCompra('${s.id}')">Comprar / Cotar</button>`:''}
@@ -1159,6 +1212,14 @@ window.abrirCompra=function(solId){
   openModal('modalCompra');
 };
 
+window.calcTotal=function(){
+  const qtd=Number(document.getElementById('compraQtd').value)||0;
+  const val=Number(document.getElementById('compraValor').value)||0;
+  const total=qtd*val;
+  const el=document.getElementById('compraTotal');
+  if(el) el.textContent='R$ '+total.toFixed(2).replace('.',',');
+};
+
 window.toggleCompraFields=function(){
   const tipo=document.getElementById('compraTipo').value;
   document.getElementById('compraFields').style.display=tipo==='Comprou'?'':'none';
@@ -1168,21 +1229,43 @@ window.saveCompra=async function(){
   const solId=document.getElementById('compraSOLID').value;
   const tipo=document.getElementById('compraTipo').value;
   const s=state.solicitacoes.find(x=>x.id===solId);
+  const qtdCompra=tipo==='Comprou'?Number(document.getElementById('compraQtd').value):s.qtd;
+  const valorUnit=tipo==='Comprou'?Number(document.getElementById('compraValor').value):0;
   s.status=tipo;
   s.fornecedorId=document.getElementById('compraForn').value||s.fornecedorId;
   s.compra={
-    tipo,
-    fornecedorId:s.fornecedorId,
-    valor:tipo==='Comprou'?Number(document.getElementById('compraValor').value):0,
-    qtd:tipo==='Comprou'?Number(document.getElementById('compraQtd').value):s.qtd,
+    tipo, fornecedorId:s.fornecedorId,
+    valor:valorUnit, qtd:qtdCompra,
+    total:valorUnit*qtdCompra,
     data:tipo==='Comprou'?document.getElementById('compraData').value:'',
     previsao:tipo==='Comprou'?document.getElementById('compraPrevisao').value:'',
     obs:document.getElementById('compraObs').value
   };
   await upsertDoc('solicitacoes', s);
+  // Se Comprou: creditar estoque + registrar movimentação
+  if(tipo==='Comprou'){
+    const prodIdx=state.estoque.findIndex(e=>e.id===s.produtoId);
+    if(prodIdx>=0){
+      const estoqueAntes=state.estoque[prodIdx].estoque;
+      state.estoque[prodIdx].estoque=estoqueAntes + qtdCompra;
+      await upsertDoc('estoque', state.estoque[prodIdx]);
+      const mov={
+        id:uid(), tipo:'Entrada',
+        produtoId:s.produtoId, produtoNome:state.estoque[prodIdx].nome,
+        qtd:qtdCompra, estoqueAntes, estoqueDepois:state.estoque[prodIdx].estoque,
+        valorUnit, total:valorUnit*qtdCompra,
+        referencia:s.numero, referenciaId:s.id,
+        fornecedorId:s.fornecedorId,
+        usuario:currentUser?.email||'', dataHora:new Date().toISOString()
+      };
+      if(!state.movimentacoes) state.movimentacoes=[];
+      state.movimentacoes.unshift(mov);
+      await upsertDoc('movimentacoes', mov);
+    }
+  }
   closeModal('modalCompra');
   renderSolicitacoes();
-  toast(tipo==='Comprou'?'Compra registrada!':'Cotação registrada!');
+  toast(tipo==='Comprou'?'Compra registrada! Estoque atualizado.':'Cotação registrada!');
 };
 
 window.delSol=async function(id){
@@ -1368,6 +1451,39 @@ window.delSolicitante=async function(id){
   toast('Excluído.','error');
 };
 
+// ─── MOVIMENTAÇÕES ────────────────────────────────────────────────
+function renderMovimentacoes(){
+  const body=document.getElementById('movBody');
+  const filtro=document.getElementById('filtroMov')?.value||'';
+  let lista=state.movimentacoes||[];
+  if(filtro) lista=lista.filter(m=>m.tipo===filtro);
+  if(!lista.length){
+    body.innerHTML='<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--muted)">Nenhuma movimentação registrada.</td></tr>';
+    return;
+  }
+  const fmt2=v=>'R$ '+Number(v||0).toFixed(2).replace('.',',');
+  body.innerHTML=lista.map(m=>{
+    const isEntrada=m.tipo==='Entrada';
+    const cor=isEntrada?'var(--accent2)':'var(--danger)';
+    const sinal=isEntrada?'+':'-';
+    const dh=new Date(m.dataHora);
+    const dataHoraFmt=dh.toLocaleDateString('pt-BR')+' '+dh.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'});
+    return `<tr>
+      <td style="font-size:12px;color:var(--muted);white-space:nowrap">${dataHoraFmt}</td>
+      <td><span class="badge ${isEntrada?'badge-green':'badge-red'}">${m.tipo}</span></td>
+      <td>
+        <div style="font-weight:600;font-size:13px">${m.produtoNome||'—'}</div>
+        ${m.total?`<div style="font-size:11px;color:var(--muted);margin-top:2px">${fmt2(m.total)} total</div>`:''}
+      </td>
+      <td style="font-weight:700;color:${cor};font-size:14px">${sinal}${m.qtd}</td>
+      <td style="font-size:13px;color:var(--muted)">${m.estoqueAntes??'—'}</td>
+      <td style="font-size:13px;font-weight:600">${m.estoqueDepois??'—'}</td>
+      <td><span style="font-size:12px;color:var(--accent)">${m.referencia||'—'}</span></td>
+      <td style="font-size:11px;color:var(--muted)">${m.usuario||'—'}</td>
+    </tr>`;
+  }).join('');
+}
+
 // ─── RELATÓRIOS ───────────────────────────────────────────────────
 function renderRelatorios(){
   const valor=state.estoque.reduce((a,e)=>a+e.estoque*e.custo,0);
@@ -1473,7 +1589,8 @@ Object.assign(window._mod, {
   editForn: window.editForn, delForn: window.delForn, saveSolicitante: window.saveSolicitante,
   editSolicitante: window.editSolicitante, delSolicitante: window.delSolicitante,
   saveConfig: window.saveConfig, addCat: window.addCat, delCat: window.delCat,
-  exportCSV: window.exportCSV
+  exportCSV: window.exportCSV,
+  calcTotal: window.calcTotal
 });
 </script>
 </body>
