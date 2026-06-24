@@ -173,8 +173,59 @@ select option{background:var(--surface2);}
 .info-box{background:rgba(79,142,247,0.08);border:1px solid rgba(79,142,247,0.2);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--muted);margin-bottom:14px;}
 
 @media(max-width:900px){
-  .sol-layout{grid-template-columns:1fr;}
   .form-row,.form-row-3{grid-template-columns:1fr;}
+}
+
+/* ── MOBILE ── */
+@media(max-width:768px){
+  :root{--sidebar-w:0px;}
+  #sidebar{
+    transform:translateX(-100%);transition:transform 0.25s;
+    width:240px;z-index:500;
+  }
+  #sidebar.mob-open{transform:translateX(0);}
+  #main{margin-left:0;}
+  .mob-menu-btn{
+    display:flex;align-items:center;justify-content:center;
+    width:36px;height:36px;border-radius:8px;border:none;
+    background:var(--surface2);color:var(--text);font-size:18px;cursor:pointer;
+  }
+  .mob-overlay{
+    display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:499;
+  }
+  .mob-overlay.open{display:block;}
+  header{padding:12px 16px;}
+  .content{padding:14px;}
+  .table-header{flex-direction:column;align-items:flex-start;gap:10px;}
+  .table-header > div{width:100%;flex-wrap:wrap;}
+  .table-header .search-input{flex:1;min-width:120px;}
+  .table-header .btn{width:100%;}
+  /* Cards da tabela mobile — esconder colunas menos importantes */
+  table{display:block;}
+  thead{display:none;}
+  tbody{display:block;}
+  tr{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:6px;padding:12px 14px;
+    border-bottom:1px solid var(--border);
+    background:var(--surface);
+  }
+  tr:hover{background:var(--surface2);}
+  td{
+    display:block;padding:0;border:none;
+    font-size:13px;
+  }
+  /* Produto ocupa linha inteira */
+  td:nth-child(2){grid-column:1/-1;}
+  /* Ações ocupa linha inteira */
+  td:last-child{grid-column:1/-1;margin-top:4px;}
+  .actions{flex-wrap:wrap;}
+  .actions .btn{flex:1;text-align:center;justify-content:center;}
+  .modal{padding:20px 16px;}
+  .modal-lg{width:100%;}
+  .cards{grid-template-columns:1fr 1fr;}
+  .sidebar-footer{padding:10px;}
 }
 </style>
 </head>
@@ -198,6 +249,9 @@ select option{background:var(--surface2);}
   <span style="color:var(--muted);font-size:13px">Carregando...</span>
 </div>
 
+<!-- OVERLAY MOBILE -->
+<div class="mob-overlay" id="mobOverlay" onclick="closeMobMenu()"></div>
+
 <!-- SIDEBAR -->
 <aside id="sidebar">
   <div class="logo">
@@ -216,8 +270,17 @@ select option{background:var(--surface2);}
 <!-- MAIN -->
 <div id="main">
   <header>
+    <button class="mob-menu-btn" id="mobMenuBtn" onclick="openMobMenu()" style="display:none">☰</button>
     <div class="page-title" id="pageTitle">Carregando...</div>
-    <div id="headerActions"></div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div id="autoRefreshIndicator" style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:5px">
+        <span id="refreshCountdown" style="font-family:monospace"></span>
+      </div>
+      <button class="btn btn-secondary btn-sm" id="btnRefresh" onclick="manualRefresh()" title="Atualizar dados">
+        <span id="refreshIcon">🔄</span> Atualizar
+      </button>
+      <div id="headerActions"></div>
+    </div>
   </header>
   <div class="content">
 
@@ -240,7 +303,7 @@ select option{background:var(--surface2);}
         </div>
         <table id="solTable">
           <thead><tr>
-            <th>ID</th><th>Produto</th><th>Qtd</th><th>Solicitante</th>
+            <th>Código</th><th>Produto</th><th>Solicitante</th>
             <th>Prioridade</th><th>Fornecedor</th><th>Status</th><th>Ações</th>
           </tr></thead>
           <tbody id="solBody"></tbody>
@@ -553,7 +616,7 @@ select option{background:var(--surface2);}
 <!-- Ponte global: permite onclick= no HTML chamar funções do módulo ES -->
 <script>
 window._mod = {};
-['doLogin','doLogout','goTo','filterTable','openModal','closeModal','toggleCollapse',
+['doLogin','doLogout','goTo','filterTable','openModal','closeModal','toggleCollapse','openMobMenu','closeMobMenu','manualRefresh',
  'openProdDrop','filterProdDrop','selectProd','openFornDrop','filterFornDrop','selectForn',
  'openSolicitanteDrop','filterSolicitanteDrop','selectSolicitante',
  'saveNovoProduto','saveNovoFornecedor','saveSolicitacao','abrirCompra',
@@ -700,7 +763,7 @@ window.doLogin = async function(){
 };
 
 window.doLogout=async function(){
-  if(confirm('Deseja sair?')) await signOut(auth);
+  if(confirm('Deseja sair?')){ stopAutoRefresh(); await signOut(auth); }
 };
 
 document.getElementById('loginPassword').addEventListener('keydown',e=>{
@@ -724,6 +787,7 @@ onAuthStateChanged(auth, async(user)=>{
     document.getElementById('empresaLabel').textContent=state.config?.empresa||'Gestor de Estoque';
     document.getElementById('loadingOverlay').classList.add('hidden');
     goTo(MENUS[userRole]?.[0]?.id||'solicitacoes');
+    startAutoRefresh();
   } else {
     currentUser=null; userRole=null;
     document.getElementById('loginScreen').classList.remove('hidden');
@@ -734,6 +798,82 @@ onAuthStateChanged(auth, async(user)=>{
 });
 
 // ─── NAV ─────────────────────────────────────────────────────────
+// ─── AUTO REFRESH ────────────────────────────────────────────────
+let autoRefreshInterval = null;
+let countdownInterval  = null;
+let currentPage        = 'solicitacoes';
+const REFRESH_SECS     = 30;
+
+function startAutoRefresh() {
+  stopAutoRefresh();
+  let secs = REFRESH_SECS;
+  const cd = document.getElementById('refreshCountdown');
+  if(cd) cd.textContent = secs + 's';
+
+  countdownInterval = setInterval(() => {
+    secs--;
+    if(cd) cd.textContent = secs + 's';
+    if(secs <= 0) secs = REFRESH_SECS;
+  }, 1000);
+
+  autoRefreshInterval = setInterval(async () => {
+    await silentRefresh();
+    secs = REFRESH_SECS;
+  }, REFRESH_SECS * 1000);
+}
+
+function stopAutoRefresh() {
+  if(autoRefreshInterval) clearInterval(autoRefreshInterval);
+  if(countdownInterval)   clearInterval(countdownInterval);
+}
+
+async function silentRefresh() {
+  await loadFromFirestore();
+  rerenderCurrentPage();
+}
+
+window.manualRefresh = async function() {
+  const icon = document.getElementById('refreshIcon');
+  const btn  = document.getElementById('btnRefresh');
+  if(btn) btn.disabled = true;
+  if(icon) icon.textContent = '⏳';
+  await silentRefresh();
+  if(icon) icon.textContent = '✓';
+  setTimeout(() => {
+    if(icon) icon.textContent = '🔄';
+    if(btn)  btn.disabled = false;
+  }, 1500);
+  // Resetar countdown
+  stopAutoRefresh();
+  startAutoRefresh();
+};
+
+function rerenderCurrentPage() {
+  if(currentPage==='solicitacoes') renderSolicitacoes();
+  else if(currentPage==='estoque') renderEstoque();
+  else if(currentPage==='fornecedores') renderFornecedores();
+  else if(currentPage==='solicitantes') renderSolicitantes();
+  else if(currentPage==='relatorios') renderRelatorios();
+  else if(currentPage==='configuracoes') renderConfiguracoes();
+}
+
+// ─── MOBILE MENU ─────────────────────────────────────────────────
+window.openMobMenu=function(){
+  document.getElementById('sidebar').classList.add('mob-open');
+  document.getElementById('mobOverlay').classList.add('open');
+};
+window.closeMobMenu=function(){
+  document.getElementById('sidebar').classList.remove('mob-open');
+  document.getElementById('mobOverlay').classList.remove('open');
+};
+function checkMobile(){
+  const isMob=window.innerWidth<=768;
+  const btn=document.getElementById('mobMenuBtn');
+  if(btn) btn.style.display=isMob?'flex':'none';
+}
+window.addEventListener('resize',checkMobile);
+checkMobile();
+
 function buildNav(){
   const nav=document.getElementById('sideNav');
   const menus=MENUS[userRole]||MENUS.consultor;
@@ -751,6 +891,8 @@ window.goTo=function(page){
   const el=document.getElementById('page-'+page);
   if(!el)return;
   el.classList.add('active');
+  currentPage = page;
+  if(window.innerWidth<=768) window.closeMobMenu();
   document.querySelectorAll('nav a').forEach(a=>{
     if(a.getAttribute('onclick')?.includes("'"+page+"'")) a.classList.add('active');
   });
@@ -965,14 +1107,33 @@ function renderSolicitacoes(){
     const prod=getProduto(s.produtoId);
     const forn=s.fornecedorId?getFornecedor(s.fornecedorId):{nome:'—'};
     const sol=getSolicitante(s.solicitanteId);
-    const compraInfo=s.compra?`<div style="font-size:11px;color:var(--muted);margin-top:3px">${s.compra.tipo==='Comprou'?'🛒':'💬'} ${fmt(s.compra.valor||0)} × ${s.compra.qtd||''} ${s.compra.previsao?'| Prev: '+fmtDate(s.compra.previsao):''}</div>`:'';
+    const compraInfo=s.compra?`
+      <div style="margin-top:5px;padding:5px 8px;background:var(--surface2);border-radius:6px;font-size:11px;color:var(--muted)">
+        ${s.compra.tipo==='Comprou'?'🛒 Compra':'💬 Cotação'}
+        ${s.compra.valor?` · ${fmt(s.compra.valor)} × ${s.compra.qtd}`:''}
+        ${s.compra.previsao?` · Entrega: ${fmtDate(s.compra.previsao)}`:''}
+        ${s.compra.obs?`<br><span style="color:var(--muted)">${s.compra.obs}</span>`:''}
+      </div>`:'';
+    const statusEstoque = prod.estoque===0?'<span style="color:var(--danger);font-size:10px">● Sem estoque</span>':prod.estoque<prod.minimo?'<span style="color:var(--warn);font-size:10px">● Estoque baixo</span>':'';
     return `<tr>
-      <td><b style="font-size:12px">${s.numero}</b></td>
-      <td><b>${prod.nome}</b><div style="font-size:11px;color:var(--muted)">${prod.codigo} | Qtd: ${s.qtd}</div>${compraInfo}</td>
-      <td>${s.qtd}</td>
-      <td>${sol.nome}</td>
+      <td>
+        <div style="font-family:monospace;font-size:12px;color:var(--muted)">${prod.codigo||s.numero}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:2px">${s.numero}</div>
+      </td>
+      <td>
+        <div style="font-weight:600;font-size:13px">${prod.nome}</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-top:3px;flex-wrap:wrap">
+          <span style="font-size:11px;color:var(--muted)">Qtd: <b style="color:var(--text)">${s.qtd}</b></span>
+          ${statusEstoque}
+        </div>
+        ${compraInfo}
+      </td>
+      <td>
+        <div style="font-size:13px">${sol.nome}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">${fmtDate(s.data)}</div>
+      </td>
       <td><span class="badge ${prioColor(s.prioridade)}">${s.prioridade}</span></td>
-      <td>${forn.nome}</td>
+      <td style="font-size:13px">${forn.nome}</td>
       <td>${statusBadge(s.status)}</td>
       <td><div class="actions">
         ${s.status!=='Cancelado'&&s.status!=='Comprou'&&userRole!=='consultor'
