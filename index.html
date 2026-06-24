@@ -866,16 +866,6 @@ window.manualRefresh = async function() {
   }, 1500);
 };
 
-function rerenderCurrentPage() {
-  if(currentPage==='solicitacoes') renderSolicitacoes();
-  else if(currentPage==='estoque') renderEstoque();
-  else if(currentPage==='fornecedores') renderFornecedores();
-  else if(currentPage==='solicitantes') renderSolicitantes();
-  else if(currentPage==='movimentacoes') renderMovimentacoes();
-  else if(currentPage==='relatorios') renderRelatorios();
-  else if(currentPage==='configuracoes') renderConfiguracoes();
-}
-
 // ─── MOBILE MENU ─────────────────────────────────────────────────
 window.openMobMenu=function(){
   document.getElementById('sidebar').classList.add('mob-open');
