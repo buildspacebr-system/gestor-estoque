@@ -553,9 +553,25 @@ select option{background:var(--surface2);}
 
 <div id="toast"></div>
 
-<!-- FIREBASE -->
-<script type="module">
-<!-- FIREBASE -->
+<!-- Ponte global: permite onclick= no HTML chamar funções do módulo ES -->
+<script>
+window._mod = {};
+['doLogin','doLogout','goTo','filterTable','openModal','closeModal','toggleCollapse',
+ 'openProdDrop','filterProdDrop','selectProd','openFornDrop','filterFornDrop','selectForn',
+ 'openSolicitanteDrop','filterSolicitanteDrop','selectSolicitante',
+ 'saveNovoProduto','saveNovoFornecedor','saveSolicitacao','abrirCompra',
+ 'toggleCompraFields','saveCompra','delSol','saveEstoque','editEstoque','delEstoque',
+ 'saveFornecedor','editForn','delForn','saveSolicitante','editSolicitante','delSolicitante',
+ 'saveConfig','addCat','delCat','exportCSV'
+].forEach(fn => {
+  window[fn] = function(...a) {
+    if (window._mod[fn]) return window._mod[fn](...a);
+    setTimeout(() => window[fn](...a), 300);
+  };
+});
+</script>
+
+<!-- FIREBASE MODULE -->
 <script type="module">
 import { initializeApp }   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged }
@@ -1279,6 +1295,26 @@ window.exportCSV=function(type){
   toast('Exportado!');
 };
 
+
+// Registrar todas as funções no objeto _mod para a ponte global
+Object.assign(window._mod, {
+  doLogin: window.doLogin, doLogout: window.doLogout, goTo: window.goTo,
+  filterTable: window.filterTable, openModal: window.openModal, closeModal: window.closeModal,
+  toggleCollapse: window.toggleCollapse, openProdDrop: window.openProdDrop,
+  filterProdDrop: window.filterProdDrop, selectProd: window.selectProd,
+  openFornDrop: window.openFornDrop, filterFornDrop: window.filterFornDrop,
+  selectForn: window.selectForn, openSolicitanteDrop: window.openSolicitanteDrop,
+  filterSolicitanteDrop: window.filterSolicitanteDrop, selectSolicitante: window.selectSolicitante,
+  saveNovoProduto: window.saveNovoProduto, saveNovoFornecedor: window.saveNovoFornecedor,
+  saveSolicitacao: window.saveSolicitacao, abrirCompra: window.abrirCompra,
+  toggleCompraFields: window.toggleCompraFields, saveCompra: window.saveCompra,
+  delSol: window.delSol, saveEstoque: window.saveEstoque, editEstoque: window.editEstoque,
+  delEstoque: window.delEstoque, saveFornecedor: window.saveFornecedor,
+  editForn: window.editForn, delForn: window.delForn, saveSolicitante: window.saveSolicitante,
+  editSolicitante: window.editSolicitante, delSolicitante: window.delSolicitante,
+  saveConfig: window.saveConfig, addCat: window.addCat, delCat: window.delCat,
+  exportCSV: window.exportCSV
+});
 </script>
 </body>
 </html>
